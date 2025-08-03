@@ -1,0 +1,28 @@
+{
+  "name": "train-game-app",
+  "version": "1.0.0",
+  "description": "A web-based game modeled after a board game featuring a 2D map with dots that players can connect.",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "tsc && lite-server",
+    "build": "tsc",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "board-game",
+    "typescript",
+    "web-game"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2"
+  },
+  "devDependencies": {
+    "typescript": "^4.4.4",
+    "lite-server": "^2.6.1",
+    "@types/react": "^17.0.2",
+    "@types/react-dom": "^17.0.2"
+  }
+}
