@@ -2,11 +2,11 @@
   "name": "train-game-app",
   "version": "1.0.0",
   "description": "A web-based game modeled after a board game featuring a 2D map with dots that players can connect.",
-  "main": "src/index.ts",
+  "main": "src/index.tsx",
   "scripts": {
-    "start": "tsc && lite-server",
-    "build": "tsc",
-    "test": "echo \"No tests specified\" && exit 0"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "keywords": [
     "board-game",
@@ -20,9 +20,10 @@
     "react-dom": "^17.0.2"
   },
   "devDependencies": {
+    "@types/react": "^17.0.87",
+    "@types/react-dom": "^17.0.26",
     "typescript": "^4.4.4",
-    "lite-server": "^2.6.1",
-    "@types/react": "^17.0.2",
-    "@types/react-dom": "^17.0.2"
+    "vite": "^4.0.0",
+    "@vitejs/plugin-react": "^4.0.0"
   }
 }
