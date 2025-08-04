@@ -1,9 +1,9 @@
 import Line from "./Line";
-import type Dot from "./Dot";
+import type Milepost from "./Milepost";
 import Board from "./Board";
 
 export default class GameLogic {
-  private selectedDots: Dot[] = [];
+  private selectedDots: Milepost[] = [];
   private lines: Line[] = [];
   private board: Board;
 
@@ -11,14 +11,14 @@ export default class GameLogic {
     this.board = board;
   }
 
-  public selectDot(dot: Dot): void {
+  public selectDot(dot: Milepost): void {
     if (this.isDotSelectable(dot)) {
       this.selectedDots.push(dot);
       this.checkForLine();
     }
   }
 
-  private isDotSelectable(dot: Dot): boolean {
+  private isDotSelectable(dot: Milepost): boolean {
     return !this.selectedDots.includes(dot);
   }
 
@@ -47,7 +47,7 @@ export default class GameLogic {
     return this.lines;
   }
 
-  public getSelectedDots(): Dot[] {
+  public getSelectedDots(): Milepost[] {
     return this.selectedDots;
   }
 }

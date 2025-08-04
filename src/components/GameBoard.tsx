@@ -47,7 +47,7 @@ const GameBoard: React.FC = () => {
         // Initial draw
         context.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         boardRef.current.drawBorder(context);
-        boardRef.current.drawDots(context);
+        boardRef.current.drawMileposts(context);
       }
     }
   }, [numPlayers]);
@@ -63,7 +63,7 @@ const GameBoard: React.FC = () => {
       // Restrict drawing to inside the border
       if (x >= 0 && x <= CANVAS_WIDTH && y >= 0 && y <= CANVAS_HEIGHT) {
         // Find the nearest dot within a certain radius
-        const dots = boardRef.current.getDots();
+        const dots = boardRef.current.getMileposts();
         const radius = 10;
         const clickedDot = dots.find(
           (dot) => Math.hypot(dot.x - x, dot.y - y) <= radius
@@ -76,7 +76,7 @@ const GameBoard: React.FC = () => {
         // Redraw
         context.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         boardRef.current.drawBorder(context);
-        boardRef.current.drawDots(context);
+        boardRef.current.drawMileposts(context);
         // Draw all lines
         gameLogicRef.current.getLines().forEach((line) => {
           line.render(context);

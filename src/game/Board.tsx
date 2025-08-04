@@ -1,10 +1,13 @@
+import Milepost from "./Milepost";
+import MountainMilepost from "./MountainMilepost";
+
 export default class Board {
   width: number;
   height: number;
   spacing: number; // verical spacing
   horizontalSpacing: number; // horizontal spacing
   offsetRows: boolean;
-  dots: { x: number; y: number }[];
+  mileposts: Array<Milepost | MountainMilepost>;
 
   constructor(
     width: number,
@@ -18,12 +21,12 @@ export default class Board {
     this.spacing = spacing;
     this.horizontalSpacing = horizontalSpacing ?? spacing; // Assuming horizontal spacing is the same as vertical
     this.offsetRows = offsetRows;
-    this.dots = [];
-    this.generateDots();
+    this.mileposts = [];
+    this.generateMileposts();
   }
 
-  generateDots() {
-    this.dots = [];
+  generateMileposts() {
+    this.mileposts = [];
     const rows = Math.floor(this.height / this.spacing);
     const cols = Math.floor(this.width / this.horizontalSpacing);
     for (let row = 0; row <= rows; row++) {
@@ -36,14 +39,20 @@ export default class Board {
           (this.offsetRows && row % 2 === 1 ? this.horizontalSpacing / 2 : 0);
         // Only add dots that are within the border
         if (x <= this.width && y <= this.height) {
-          this.dots.push({ x, y });
+          const isMountain = Math.random() < 0.1; // 10% chance to be a mountain milepost
+          // Create either a regular or mountain milepost
+          if (isMountain) {
+            this.mileposts.push(new MountainMilepost(x, y));
+          } else {
+            this.mileposts.push(new Milepost(x, y));
+          }
         }
       }
     }
   }
 
-  getDots() {
-    return this.dots;
+  getMileposts() {
+    return this.mileposts;
   }
 
   public drawBorder(ctx: CanvasRenderingContext2D): void {
@@ -51,12 +60,10 @@ export default class Board {
     ctx.strokeRect(0, 0, this.width, this.height);
   }
 
-  public drawDots(ctx: CanvasRenderingContext2D): void {
+  public drawMileposts(ctx: CanvasRenderingContext2D): void {
     ctx.fillStyle = "blue";
-    this.dots.forEach((dot) => {
-      ctx.beginPath();
-      ctx.arc(dot.x, dot.y, 2, 0, Math.PI * 2);
-      ctx.fill();
+    this.mileposts.forEach((milepost) => {
+      milepost.draw(ctx);
     });
   }
 }
