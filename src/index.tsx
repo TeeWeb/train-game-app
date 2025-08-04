@@ -4,11 +4,13 @@ import React from "react";
 import ReactDOM from "react-dom";
 import GameBoard from "./components/GameBoard";
 import "../styles.css"; // Assuming you have a styles.css for basic styling
+import UI from "./components/UI";
 
 const App = () => {
   return (
     <div id="root" className="app-container">
-      <h1>Board Game</h1>
+      <h1>The Train Game</h1>
+      <UI />
       <GameBoard />
     </div>
   );

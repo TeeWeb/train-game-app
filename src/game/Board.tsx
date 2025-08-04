@@ -16,7 +16,7 @@ export default class Board {
     this.width = width;
     this.height = height;
     this.spacing = spacing;
-    this.horizontalSpacing = this.horizontalSpacing ?? spacing; // Assuming horizontal spacing is the same as vertical
+    this.horizontalSpacing = horizontalSpacing ?? spacing; // Assuming horizontal spacing is the same as vertical
     this.offsetRows = offsetRows;
     this.dots = [];
     this.generateDots();
