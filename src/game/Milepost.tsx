@@ -12,10 +12,11 @@ const Milepost: React.FC<MilepostProps> = ({
   const [isSelected, setIsSelected] = useState(selected);
   const [cost, setCost] = useState(1);
   const [currentColor, setCurrentcolor] = useState(color);
+  const [size, setSize] = useState(2); // Default size for the milepost
 
   const draw = (ctx: CanvasRenderingContext2D) => {
     ctx.beginPath();
-    ctx.arc(x, y, 2, 0, Math.PI * 2);
+    ctx.arc(x, y, size, 0, Math.PI * 2);
     ctx.fillStyle = selected ? "orange" : "black";
     ctx.fill();
     ctx.closePath();
@@ -34,7 +35,7 @@ const Milepost: React.FC<MilepostProps> = ({
 
   return (
     <mesh position={[x, y, 0]} onClick={toggleSelect}>
-      <sphereGeometry args={[3, 3, 3]} />
+      <sphereGeometry args={[size, size, size]} />
       <meshStandardMaterial color={currentColor} />
     </mesh>
   );

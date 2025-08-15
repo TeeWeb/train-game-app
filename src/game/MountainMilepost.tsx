@@ -14,7 +14,7 @@ const MountainMilepost: React.FC<MilepostProps> = ({
   const [currentColor, setCurrentColor] = useState(color);
 
   // Triangle geometry using three vertices
-  const size = 5; // Size of the triangle
+  const size = 3; // Size of the triangle
   const triangleShape = [
     [0, size, 0],
     [-size, -size, 0],

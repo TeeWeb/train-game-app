@@ -1,16 +1,17 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { PerspectiveCamera } from "@react-three/drei";
+import { PerspectiveCamera, Line } from "@react-three/drei";
+import * as THREE from "three";
 
 import Milepost from "./Milepost";
 import type { MilepostProps } from "../types";
 import MountainMilepost from "./MountainMilepost";
 import GameLogic from "./GameLogic";
 
-const VERTICAL_SPACING = 20; // Make dots closer together
-const HORIZONTAL_SPACING = 50; // Horizontal spacing for offset rows
+const VERTICAL_SPACING = 10; // Make dots closer together
+const HORIZONTAL_SPACING = 35; // Horizontal spacing for offset rows
 const MIN_ZOOM = 200;
-const MAX_ZOOM = 2000;
+const MAX_ZOOM = 2500;
 const ZOOM_STEP = 50;
 
 interface BoardProps {
@@ -63,7 +64,83 @@ const Board: React.FC<BoardProps> = ({
     button: 0,
   });
 
-  // Generate coordinates for mileposts
+  function generateNoisyLoop(
+    width: number,
+    height: number,
+    numPoints: number = 120,
+    areaRatio: number = 0.65
+  ): [number, number][] {
+    const cx = (width - HORIZONTAL_SPACING * 2) / 2;
+    const cy = (height - VERTICAL_SPACING * 2) / 2;
+    // Target radius for desired area
+    const targetArea = width * height * areaRatio;
+    // Ensure the radius never exceeds the distance to the nearest edge
+    const maxRadiusX = Math.min(cx, width - cx);
+    const maxRadiusY = Math.min(cy, height - cy);
+    // Use the smaller of calculated baseRadius and max allowed radius
+    const baseRadius = Math.min(
+      Math.sqrt(targetArea / Math.PI),
+      maxRadiusX * 0.98,
+      maxRadiusY * 0.98
+    );
+
+    const points: [number, number][] = [];
+    for (let i = 0; i < numPoints; i++) {
+      const theta = (i / numPoints) * Math.PI * 2;
+      // Add noise for concave/convex features
+      const noise =
+        Math.sin(theta * 7) * baseRadius * 0.1 +
+        Math.cos(theta * 4) * baseRadius * 0.1 +
+        (Math.random() - 1.2) * baseRadius * 0.05; // Adjust noise amplitude
+      // Skew the shape
+      let x =
+        cx +
+        Math.cos(theta) * (baseRadius + noise) * (1 + 0.25 * Math.sin(theta));
+      let y =
+        cy +
+        Math.sin(theta) *
+          (baseRadius + noise) *
+          (1 + 0.45 * Math.cos(theta - 0.5));
+      // Clamp x and y to stay within the board
+      x = Math.max(HORIZONTAL_SPACING, Math.min(width, x));
+      y = Math.max(VERTICAL_SPACING, Math.min(height, y));
+      points.push([x, y]);
+    }
+    // Ensure the loop is closed by making the last point equal to the first
+    if (points.length > 0) {
+      points.push([...points[0]]);
+    }
+    return points;
+  }
+
+  // Memoize the loop points so they don't change every render
+  const loopPoints = useMemo(
+    () => generateNoisyLoop(boardWidth, boardHeight, 120, 0.65),
+    [boardWidth, boardHeight]
+  );
+
+  // Convert to THREE.Vector3[]
+  const threePoints = useMemo(
+    () => loopPoints.map(([x, y]) => new THREE.Vector3(x, y, 2)), // z=2 to draw above the board
+    [loopPoints]
+  );
+
+  // Utility: Ray-casting algorithm for point-in-polygon
+  function isPointInPolygon(x: number, y: number, polygon: [number, number][]) {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i][0],
+        yi = polygon[i][1];
+      const xj = polygon[j][0],
+        yj = polygon[j][1];
+      const intersect =
+        yi > y !== yj > y &&
+        x < ((xj - xi) * (y - yi)) / (yj - yi + Number.EPSILON) + xi;
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
   const generateMilepostCoords = (): { x: number; y: number }[] => {
     const coords: { x: number; y: number }[] = [];
     for (let row = 0; row < numRows; row++) {
@@ -73,7 +150,12 @@ const Board: React.FC<BoardProps> = ({
           col * horizontalSpacing +
           horizontalSpacing / 2 +
           (row % 2 === 1 ? horizontalSpacing / 2 : 0);
-        if (x < boardWidth && y < boardHeight) {
+        // Only add if inside noisy loop polygon
+        if (
+          x < boardWidth &&
+          y < boardHeight &&
+          isPointInPolygon(x, y, loopPoints)
+        ) {
           coords.push({ x, y });
         }
       }
@@ -264,6 +346,12 @@ const Board: React.FC<BoardProps> = ({
           background: "#181820",
         }}
       >
+        <Line
+          points={threePoints}
+          color="black"
+          lineWidth={8} // Bold line
+          transparent={false}
+        />
         <PerspectiveCamera
           makeDefault
           position={[cameraX, cameraY, cameraZ]}

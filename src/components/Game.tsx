@@ -121,7 +121,7 @@ const Game: React.FC = () => {
             </span>
           </p>
         </div>
-        <Board width={1600} height={1200} mountainProbability={0.05} />
+        <Board width={1200} height={1200} mountainProbability={0.15} />
         <UI
           playerData={players}
           currentPlayerIndex={currentPlayerIndex}
