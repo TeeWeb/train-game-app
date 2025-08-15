@@ -6,6 +6,8 @@ const MountainMilepost: React.FC<MilepostProps> = ({
   yCoord,
   selected,
   color,
+  onClick,
+  isClickable = true,
 }) => {
   const [x, setX] = useState(xCoord);
   const [y, setY] = useState(yCoord);
@@ -21,29 +23,49 @@ const MountainMilepost: React.FC<MilepostProps> = ({
     [size, -size, 0],
   ];
 
+  const handleClick = () => {
+    console.log("Mountain Milepost clicked at:", x, y);
+    if (onClick && isClickable) {
+      onClick();
+    }
+  };
+
   useEffect(() => {
     setX(xCoord);
     setY(yCoord);
     setIsSelected(selected);
-  }, [xCoord, yCoord, selected]);
-
-  const toggleSelect = () => {
-    console.log("Toggling selection for MountainMilepost at:", x, y);
-    setIsSelected(!isSelected);
-  };
+    setCurrentColor(color);
+    
+    // Debug logging
+    if (selected) {
+      console.log(`Mountain Milepost at (${xCoord}, ${yCoord}) selected with color: ${color}`);
+    }
+  }, [xCoord, yCoord, selected, color]);
 
   return (
-    <mesh position={[xCoord, yCoord, 0]}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          array={new Float32Array(triangleShape.flat())}
-          count={3}
-          itemSize={3}
+    <group position={[xCoord, yCoord, 0]}>
+      <mesh onClick={handleClick}>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            array={new Float32Array(triangleShape.flat())}
+            count={3}
+            itemSize={3}
+          />
+        </bufferGeometry>
+        <meshStandardMaterial
+          color={selected ? color : "#000000"}
+          emissive={selected ? color : "#000000"}
+          emissiveIntensity={selected ? 0.3 : 0}
         />
-      </bufferGeometry>
-      <meshStandardMaterial color={currentColor} />
-    </mesh>
+      </mesh>
+      {selected && (
+        <mesh position={[0, 0, 0.1]}>
+          <ringGeometry args={[size + 1, size + 2, 16]} />
+          <meshBasicMaterial color={color} transparent opacity={0.8} />
+        </mesh>
+      )}
+    </group>
   );
 };
 

@@ -13,6 +13,8 @@ export interface MilepostProps {
   selected: boolean;
   color: string;
   isMountain?: boolean; // Optional property for mountain mileposts
+  onClick?: () => void; // Optional click handler
+  isClickable?: boolean; // Optional property to indicate if milepost is clickable
 }
 
 export type LineCoordinates = {

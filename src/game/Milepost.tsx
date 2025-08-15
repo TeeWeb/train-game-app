@@ -6,6 +6,8 @@ const Milepost: React.FC<MilepostProps> = ({
   yCoord,
   selected = false,
   color,
+  onClick,
+  isClickable = true, // New prop to indicate if the milepost is clickable
 }) => {
   const [x, setX] = useState(xCoord);
   const [y, setY] = useState(yCoord);
@@ -14,29 +16,41 @@ const Milepost: React.FC<MilepostProps> = ({
   const [currentColor, setCurrentcolor] = useState(color);
   const [size, setSize] = useState(2); // Default size for the milepost
 
-  const draw = (ctx: CanvasRenderingContext2D) => {
-    ctx.beginPath();
-    ctx.arc(x, y, size, 0, Math.PI * 2);
-    ctx.fillStyle = selected ? "orange" : "black";
-    ctx.fill();
-    ctx.closePath();
-  };
-
-  const toggleSelect = () => {
-    console.log("Toggling selection for Milepost at:", x, y);
-    selected = !selected;
+  const handleClick = () => {
+    console.log("Milepost clicked at:", x, y);
+    if (onClick && isClickable) {
+      onClick();
+    }
   };
 
   useEffect(() => {
     setX(xCoord);
     setY(yCoord);
     setIsSelected(selected);
-  }, [xCoord, yCoord, selected]);
+    setCurrentcolor(color);
+    
+    // Debug logging
+    if (selected) {
+      console.log(`Milepost at (${xCoord}, ${yCoord}) selected with color: ${color}`);
+    }
+  }, [xCoord, yCoord, selected, color]);
 
   return (
-    <mesh position={[x, y, 0]} onClick={toggleSelect}>
+    <mesh position={[x, y, 0]} onClick={handleClick}>
       <sphereGeometry args={[size, size, size]} />
-      <meshStandardMaterial color={currentColor} />
+      <meshStandardMaterial 
+        color={selected ? color : "black"} 
+        emissive={selected ? color : "#000000"}
+        emissiveIntensity={selected ? 0.3 : 0}
+        opacity={isClickable ? 1.0 : 0.5}
+        transparent={!isClickable}
+      />
+      {selected && (
+        <mesh position={[0, 0, 0.1]}>
+          <ringGeometry args={[size + 1, size + 2, 16]} />
+          <meshBasicMaterial color={color} transparent opacity={0.8} />
+        </mesh>
+      )}
     </mesh>
   );
 };

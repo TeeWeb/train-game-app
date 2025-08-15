@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Canvas } from "@react-three/fiber";
 import { PerspectiveCamera, Line } from "@react-three/drei";
 import * as THREE from "three";
@@ -7,6 +7,41 @@ import Milepost from "./Milepost";
 import type { MilepostProps } from "../types";
 import MountainMilepost from "./MountainMilepost";
 import GameLogic from "./GameLogic";
+import Player from "./Player";
+import { gameLogger } from "../utils/gameLogger";
+
+// Game phases
+export enum GamePhase {
+  MOVE = "MOVE",
+  BUILD = "BUILD",
+}
+
+// Train types
+enum TrainType {
+  LIGHT_FREIGHT = "LIGHT_FREIGHT",
+  HEAVY_FREIGHT = "HEAVY_FREIGHT",
+  PASSENGER = "PASSENGER",
+}
+
+// Train class
+class Train {
+  public speed: number = 9;
+  public capacity: number = 2;
+  public type: TrainType = TrainType.LIGHT_FREIGHT;
+  public playerId: number;
+
+  constructor(playerId: number) {
+    this.playerId = playerId;
+  }
+}
+
+// Track/Line interface for rendered tracks
+interface TrackLine {
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+  color: string;
+  playerId: number;
+}
 
 const VERTICAL_SPACING = 10; // Make dots closer together
 const HORIZONTAL_SPACING = 35; // Horizontal spacing for offset rows
@@ -18,22 +53,39 @@ interface BoardProps {
   width: number;
   height: number;
   mountainProbability: number;
+  players: Player[];
+  currentPlayerIndex: number;
+  currentRound: number;
+  currentTurn: number;
+  currentPhase: GamePhase;
+  onAdvanceGame: () => void;
+  mileposts: Omit<MilepostProps, "onClick">[];
+  loopPoints: [number, number][];
 }
 
 const Board: React.FC<BoardProps> = ({
   width,
   height,
   mountainProbability,
+  players,
+  currentPlayerIndex,
+  currentRound,
+  currentTurn,
+  currentPhase,
+  onAdvanceGame,
+  mileposts: baseMileposts,
+  loopPoints,
 }) => {
-  const [mileposts, setMileposts] = useState<MilepostProps[]>([]);
-  const [numRows, setNumRows] = useState<number>(height / VERTICAL_SPACING);
-  const [numCols, setNumCols] = useState<number>(width / HORIZONTAL_SPACING);
-  const [boardWidth, setBoardWidth] = useState<number>(width);
-  const [boardHeight, setBoardHeight] = useState<number>(height);
+  // Local UI state only
+  const [selectedMilepostIndex, setSelectedMilepostIndex] = useState<
+    number | null
+  >(null);
+  const [tracks, setTracks] = useState<TrackLine[]>([]);
+
   // Camera position state
-  const [cameraX, setCameraX] = useState<number>(boardWidth / 2);
-  const [cameraY, setCameraY] = useState<number>(boardHeight / 2);
-  const [cameraZ, setCameraZ] = useState<number>(boardWidth); // Initial zoom level
+  const [cameraX, setCameraX] = useState<number>(width / 2);
+  const [cameraY, setCameraY] = useState<number>(height / 2);
+  const [cameraZ, setCameraZ] = useState<number>(width); // Initial zoom level
 
   // Mouse tracking
   const [isMouseOverCanvas, setIsMouseOverCanvas] = useState(false);
@@ -64,112 +116,161 @@ const Board: React.FC<BoardProps> = ({
     button: 0,
   });
 
-  function generateNoisyLoop(
-    width: number,
-    height: number,
-    numPoints: number = 120,
-    areaRatio: number = 0.65
-  ): [number, number][] {
-    // Set up center points
-    const cx = width / 2;
-    const cy = height / 2 - VERTICAL_SPACING * 10; // Adjust center to account for vertical spacing
-    // Target radius for desired area
-    const targetArea = width * height * areaRatio;
-    // Ensure the radius never exceeds the distance to the nearest edge
-    const maxRadiusX = Math.min(cx, width - cx - HORIZONTAL_SPACING);
-    const maxRadiusY = Math.min(cy, height - cy - VERTICAL_SPACING);
-    // Use the smaller of calculated baseRadius and max allowed radius
-    const baseRadius = Math.min(
-      Math.sqrt(targetArea / Math.PI),
-      maxRadiusX * 0.98,
-      maxRadiusY * 0.98
-    );
-
-    const points: [number, number][] = [];
-    for (let i = 0; i < numPoints; i++) {
-      const theta = (i / numPoints) * Math.PI * 2;
-      // Add noise for concave/convex features
-      const noise =
-        Math.sin(theta * 7) * baseRadius * 0.1 +
-        Math.cos(theta * 4) * baseRadius * 0.1 +
-        (Math.random() - 1.2) * baseRadius * 0.05; // Adjust noise amplitude
-      // Skew the shape
-      let x =
-        cx +
-        Math.cos(theta) * (baseRadius + noise) * (1 + 0.25 * Math.sin(theta));
-      let y =
-        cy +
-        Math.sin(theta) *
-          (baseRadius + noise) *
-          (1 + 0.45 * Math.cos(theta - 0.5));
-      // Clamp x and y to stay within the board
-      x = Math.max(HORIZONTAL_SPACING, Math.min(width - HORIZONTAL_SPACING, x));
-      y = Math.max(VERTICAL_SPACING, Math.min(height - VERTICAL_SPACING, y));
-      points.push([x, y]);
-    }
-    // Ensure the loop is closed by making the last point equal to the first
-    if (points.length > 0) {
-      points.push([...points[0]]);
-    }
-    return points;
-  }
-
-  // Memoize the loop points so they don't change every render
-  const loopPoints = useMemo(
-    () => generateNoisyLoop(boardWidth, boardHeight, 120, 0.5),
-    [boardWidth, boardHeight]
-  );
-
   // Convert to THREE.Vector3[]
   const threePoints = useMemo(
     () => loopPoints.map(([x, y]) => new THREE.Vector3(x, y, 2)), // z=2 to draw above the board
     [loopPoints]
   );
 
-  // Utility: Ray-casting algorithm for point-in-polygon
-  function isPointInPolygon(x: number, y: number, polygon: [number, number][]) {
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      const xi = polygon[i][0],
-        yi = polygon[i][1];
-      const xj = polygon[j][0],
-        yj = polygon[j][1];
-      const intersect =
-        yi > y !== yj > y &&
-        x < ((xj - xi) * (y - yi)) / (yj - yi + Number.EPSILON) + xi;
-      if (intersect) inside = !inside;
-    }
-    return inside;
-  }
+  // Handle milepost selection and track building
+  const handleMilepostClick = useCallback(
+    (clickedIndex: number) => {
+      const currentPlayer = players[currentPlayerIndex];
+      if (!currentPlayer) return;
 
-  const generateMilepostCoords = (): { x: number; y: number }[] => {
-    const coords: { x: number; y: number }[] = [];
-    for (let row = 0; row < numRows; row++) {
-      for (let col = 0; col < numCols; col++) {
-        const y = row * verticalSpacing + verticalSpacing;
-        const x =
-          col * horizontalSpacing +
-          horizontalSpacing / 2 +
-          (row % 2 === 1 ? horizontalSpacing / 2 : 0);
-        // Only add if inside noisy loop polygon
-        if (
-          x < boardWidth &&
-          y < boardHeight &&
-          isPointInPolygon(x, y, loopPoints)
-        ) {
-          coords.push({ x, y });
+      gameLogger.log(
+        "MILEPOST_CLICK",
+        `Clicked milepost ${clickedIndex} at (${
+          baseMileposts[clickedIndex]?.xCoord?.toFixed(0) || "unknown"
+        }, ${baseMileposts[clickedIndex]?.yCoord?.toFixed(0) || "unknown"})`,
+        currentPlayer.getId(),
+        currentPlayer.getName(),
+        currentPlayer.getColor()
+      );
+
+      if (currentPhase !== GamePhase.BUILD) {
+        gameLogger.log(
+          "ACTION_BLOCKED",
+          `Cannot select milepost during ${currentPhase} phase`,
+          currentPlayer.getId(),
+          currentPlayer.getName(),
+          currentPlayer.getColor()
+        );
+        return;
+      }
+
+      if (selectedMilepostIndex === null) {
+        // First selection - select the milepost
+        gameLogger.log(
+          "MILEPOST_SELECT",
+          `Selected milepost ${clickedIndex}`,
+          currentPlayer.getId(),
+          currentPlayer.getName(),
+          currentPlayer.getColor()
+        );
+
+        setSelectedMilepostIndex(clickedIndex);
+      } else if (selectedMilepostIndex === clickedIndex) {
+        // Clicking the same milepost - deselect
+        gameLogger.log(
+          "MILEPOST_DESELECT",
+          `Deselected milepost ${clickedIndex}`,
+          currentPlayer.getId(),
+          currentPlayer.getName(),
+          currentPlayer.getColor()
+        );
+
+        setSelectedMilepostIndex(null);
+      } else {
+        // Second selection - try to build track
+        const startMilepost = baseMileposts[selectedMilepostIndex];
+        const endMilepost = baseMileposts[clickedIndex];
+
+        if (!startMilepost || !endMilepost) {
+          gameLogger.log(
+            "BUILD_ERROR",
+            `Invalid mileposts: start=${selectedMilepostIndex}, end=${clickedIndex}`,
+            currentPlayer.getId(),
+            currentPlayer.getName(),
+            currentPlayer.getColor()
+          );
+          return;
+        }
+
+        const dx = startMilepost.xCoord - endMilepost.xCoord;
+        const dy = startMilepost.yCoord - endMilepost.yCoord;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        gameLogger.log(
+          "DISTANCE_CHECK",
+          `Distance from ${selectedMilepostIndex} to ${clickedIndex}: ${distance.toFixed(
+            1
+          )} (max: ${VERTICAL_SPACING})`,
+          currentPlayer.getId(),
+          currentPlayer.getName(),
+          currentPlayer.getColor()
+        );
+
+        if (distance <= HORIZONTAL_SPACING) {
+          // Valid distance - build track
+          const newTrack: TrackLine = {
+            start: { x: startMilepost.xCoord, y: startMilepost.yCoord },
+            end: { x: endMilepost.xCoord, y: endMilepost.yCoord },
+            color: currentPlayer.getColor(),
+            playerId: currentPlayer.getId(),
+          };
+
+          setTracks((prevTracks) => {
+            const updatedTracks = [...prevTracks, newTrack];
+            gameLogger.log(
+              "TRACK_BUILT",
+              `Built track from ${selectedMilepostIndex} to ${clickedIndex} (total tracks: ${updatedTracks.length})`,
+              currentPlayer.getId(),
+              currentPlayer.getName(),
+              currentPlayer.getColor()
+            );
+            return updatedTracks;
+          });
+
+          // Move selection to destination milepost
+          setSelectedMilepostIndex(clickedIndex);
+
+          gameLogger.log(
+            "SELECTION_MOVED",
+            `Selection moved to milepost ${clickedIndex}`,
+            currentPlayer.getId(),
+            currentPlayer.getName(),
+            currentPlayer.getColor()
+          );
+        } else {
+          gameLogger.log(
+            "BUILD_BLOCKED",
+            `Track too long: ${distance.toFixed(1)} > ${VERTICAL_SPACING}`,
+            currentPlayer.getId(),
+            currentPlayer.getName(),
+            currentPlayer.getColor()
+          );
+          // If distance > VERTICAL_SPACING, do nothing (keep current selection)
         }
       }
-    }
-    return coords;
-  };
+    },
+    [
+      currentPhase,
+      selectedMilepostIndex,
+      players,
+      currentPlayerIndex,
+      baseMileposts,
+    ]
+  );
 
-  const getSelectedMilepost = () => {
-    const selectedMileposts = mileposts.filter((milepost) => milepost.selected);
-    if (selectedMileposts.length > 1)
-      console.log("More than 1 milepost is selected:", selectedMileposts);
-    return selectedMileposts;
-  };
+  // Create enhanced mileposts with onClick handlers and selection state
+  const mileposts = useMemo(() => {
+    return baseMileposts.map((milepost, index) => ({
+      ...milepost,
+      selected: selectedMilepostIndex === index,
+      color:
+        selectedMilepostIndex === index && players[currentPlayerIndex]
+          ? players[currentPlayerIndex].getColor()
+          : "black",
+      onClick: () => handleMilepostClick(index),
+    }));
+  }, [
+    baseMileposts,
+    handleMilepostClick,
+    selectedMilepostIndex,
+    players,
+    currentPlayerIndex,
+  ]);
 
   const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current.getBoundingClientRect();
@@ -180,19 +281,23 @@ const Board: React.FC<BoardProps> = ({
     // setShowCrosshairs(true);
   };
 
-  // Generate props for each milepost, randomly assigning mountains
+  // Clear milepost selections when phase changes from BUILD
   useEffect(() => {
-    const coords = generateMilepostCoords();
-    const milepostProps = coords.map(({ x, y }) => ({
-      xCoord: x,
-      yCoord: y,
-      selected: false,
-      color: "black", // Add a default color property
-      boardScale: 1, // Add a default value for boardScale
-      isMountain: Math.random() < mountainProbability,
-    }));
-    setMileposts(milepostProps);
-  }, [mountainProbability]);
+    if (currentPhase !== GamePhase.BUILD) {
+      const currentPlayer = players[currentPlayerIndex];
+      if (currentPlayer && selectedMilepostIndex !== null) {
+        gameLogger.log(
+          "SELECTION_CLEARED",
+          `Milepost selection cleared due to phase change to ${currentPhase}`,
+          currentPlayer.getId(),
+          currentPlayer.getName(),
+          currentPlayer.getColor()
+        );
+      }
+
+      setSelectedMilepostIndex(null);
+    }
+  }, [currentPhase, players, currentPlayerIndex, selectedMilepostIndex]);
 
   // WASD keyboard movement
   useEffect(() => {
@@ -342,37 +447,48 @@ const Board: React.FC<BoardProps> = ({
         style={{
           border: "2px solid black",
           display: "block",
-          width: `${boardWidth}px`,
-          height: `${boardHeight}px`,
+          width: `${width}px`,
+          height: `${height}px`,
           background: "#181820",
         }}
       >
+        {/* Boundary Loop */}
         <Line
           points={threePoints}
           color="black"
-          lineWidth={8} // Bold line
+          lineWidth={4} // Bold line
           transparent={false}
         />
+
+        {/* Render all built tracks */}
+        {tracks.map((track, index) => (
+          <Line
+            key={index}
+            points={[
+              new THREE.Vector3(track.start.x, track.start.y, 1),
+              new THREE.Vector3(track.end.x, track.end.y, 1),
+            ]}
+            color={track.color}
+            lineWidth={4}
+            transparent={false}
+          />
+        ))}
+
         <PerspectiveCamera
           makeDefault
           position={[cameraX, cameraY, cameraZ]}
           up={[0, 1, 0]}
           lookAt={[cameraX, cameraY, 0]} // Look at board center
         />
-        <ambientLight intensity={0.5} />
+        <ambientLight intensity={3} />
         <pointLight position={[10, 10, 10]} />
         <mesh
-          position={[boardWidth / 2, boardHeight / 2, -1]} // Slightly below the mileposts
+          position={[width / 2, height / 2, -1]} // Slightly below the mileposts
           // receiveShadow
         >
-          <planeGeometry args={[boardWidth, boardHeight]} />
-          <meshStandardMaterial color="#fff" opacity={1} />
+          <planeGeometry args={[width, height]} />
+          <meshStandardMaterial color="#fff" />
         </mesh>
-        {/* <gridHelper
-          args={[boardWidth, verticalSpacing, "gray", "lightgray"]}
-          position={[boardWidth / 2, boardHeight / 2, 0]}
-          rotation={[Math.PI / 2, Math.PI / 2, 0]}
-        /> */}
         <axesHelper args={[cameraZ]} />
         {mileposts.map((props, index) =>
           props.isMountain ? (
