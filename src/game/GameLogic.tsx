@@ -4,24 +4,27 @@ import Board from "./Board";
 import Player from "./Player";
 
 export default class GameLogic {
-  private selectedDots: Milepost[] = [];
+  private selectedMileposts: Milepost[] = [];
   private lines: Line[] = [];
 
   public selectDot(dot: Milepost): void {
     console.log("Selecting dot:", dot);
     if (this.isDotSelectable(dot)) {
-      this.selectedDots.push(dot);
+      this.selectedMileposts.push(dot);
       this.checkForLine();
     }
   }
 
   private isDotSelectable(dot: Milepost): boolean {
-    return !this.selectedDots.includes(dot);
+    return !this.selectedMileposts.includes(dot);
   }
 
   private checkForLine(): void {
-    if (this.selectedDots.length === 2) {
-      const line = new Line(this.selectedDots[0], this.selectedDots[1]);
+    if (this.selectedMileposts.length === 2) {
+      const line = new Line(
+        this.selectedMileposts[0],
+        this.selectedMileposts[1]
+      );
       if (this.isValidLine(line)) {
         this.lines.push(line);
         this.resetSelection();
@@ -38,16 +41,16 @@ export default class GameLogic {
   }
 
   private resetSelection(): void {
-    this.selectedDots = [];
+    this.selectedMileposts = [];
   }
 
   public getLines(): Line[] {
     return this.lines;
   }
 
-  public getSelectedDots(): Milepost[] {
-    console.log("Selected Dots:", this.selectedDots);
-    return this.selectedDots;
+  public getSelectedMileposts(): Milepost[] {
+    console.log("Selected Mileposts:", this.selectedMileposts);
+    return this.selectedMileposts;
   }
 
   public checkForGameEnd(players: Player[]): Player {

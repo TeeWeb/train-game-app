@@ -32,8 +32,6 @@ const GameLog: React.FC = () => {
     <div
       style={{
         position: "relative",
-        top: 10,
-        left: 500,
         width: "400px",
         maxHeight: isExpanded ? "300px" : "40px",
         backgroundColor: "rgba(255, 255, 255, 0.95)",

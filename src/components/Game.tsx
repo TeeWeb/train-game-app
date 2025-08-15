@@ -8,17 +8,18 @@ import { gameLogger } from "../utils/gameLogger";
 import type { MilepostProps } from "../types";
 
 const PLAYER_COLORS = [
-  "#FF5733", // Player 1 color
-  "#33FF57", // Player 2 color
-  "#3357FF", // Player 3 color
-  "#F0F033", // Player 4 color
-  "#FF33F0", // Player 5 color
-  "#33FFF0", // Player 6 color
+  "#FF5733", // Player 1 color - Orange Red
+  "#228B22", // Player 2 color - Medium Green
+  "#3357FF", // Player 3 color - Blue
+  "#DAA520", // Player 4 color - Goldenrod (was invalid format)
+  "#FF33F0", // Player 5 color - Magenta
+  "#20B2AA", // Player 6 color - Light Sea Green (was invalid format)
 ];
 
 // Constants for milepost generation
 const VERTICAL_SPACING = 10;
 const HORIZONTAL_SPACING = 35;
+const MAX_TURN_SPENDING = 20;
 
 const Game: React.FC = () => {
   const [boardScale, setBoardScale] = useState<number>(1); // Scale for the board
@@ -29,7 +30,10 @@ const Game: React.FC = () => {
   const [currentPhase, setCurrentPhase] = useState<GamePhase>(GamePhase.BUILD);
   const [players, setPlayers] = useState<Player[]>();
   const [winner, setWinner] = useState<Player | null>(null);
-  
+
+  // Track spending per turn (resets each turn)
+  const [currentTurnSpending, setCurrentTurnSpending] = useState<number>(0);
+
   // Board dimensions
   const boardWidth = 1200;
   const boardHeight = 1200;
@@ -81,11 +85,17 @@ const Game: React.FC = () => {
   };
 
   // Check if point is inside polygon
-  const isPointInPolygon = (x: number, y: number, polygon: [number, number][]) => {
+  const isPointInPolygon = (
+    x: number,
+    y: number,
+    polygon: [number, number][]
+  ) => {
     let inside = false;
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      const xi = polygon[i][0], yi = polygon[i][1];
-      const xj = polygon[j][0], yj = polygon[j][1];
+      const xi = polygon[i][0],
+        yi = polygon[i][1];
+      const xj = polygon[j][0],
+        yj = polygon[j][1];
       const intersect =
         yi > y !== yj > y &&
         x < ((xj - xi) * (y - yi)) / (yj - yi + Number.EPSILON) + xi;
@@ -95,11 +105,13 @@ const Game: React.FC = () => {
   };
 
   // Generate milepost coordinates
-  const generateMilepostCoords = (loopPoints: [number, number][]): { x: number; y: number }[] => {
+  const generateMilepostCoords = (
+    loopPoints: [number, number][]
+  ): { x: number; y: number }[] => {
     const coords: { x: number; y: number }[] = [];
     const numRows = Math.floor(boardHeight / VERTICAL_SPACING);
     const numCols = Math.floor(boardWidth / HORIZONTAL_SPACING);
-    
+
     for (let row = 0; row < numRows; row++) {
       for (let col = 0; col < numCols; col++) {
         const y = row * VERTICAL_SPACING + VERTICAL_SPACING;
@@ -128,14 +140,30 @@ const Game: React.FC = () => {
   // Generate stable milepost data
   const mileposts = useMemo(() => {
     const coords = generateMilepostCoords(loopPoints);
-    return coords.map(({ x, y }) => ({
-      xCoord: x,
-      yCoord: y,
-      selected: false,
-      color: "black",
-      isMountain: Math.random() < mountainProbability,
-      isClickable: currentPhase === GamePhase.BUILD,
-    }));
+    const generatedMileposts = coords.map(({ x, y }) => {
+      const isMountain = Math.random() < mountainProbability;
+      return {
+        xCoord: x,
+        yCoord: y,
+        selected: false,
+        color: "black",
+        isMountain: isMountain,
+        isClickable: currentPhase === GamePhase.BUILD,
+        cost: isMountain ? 2 : 1, // Mountain mileposts cost 2, regular mileposts cost 1
+        onPointerEnter: () => {},
+        onPointerLeave: () => {},
+        isPreviewTarget: false,
+      };
+    });
+
+    // Debug: Log cost distribution
+    const mountainCount = generatedMileposts.filter((m) => m.isMountain).length;
+    const cost2Count = generatedMileposts.filter((m) => m.cost === 2).length;
+    console.log(
+      `Generated ${generatedMileposts.length} mileposts: ${mountainCount} mountains, ${cost2Count} with cost=2`
+    );
+
+    return generatedMileposts;
   }, [loopPoints, mountainProbability, currentPhase]);
 
   useEffect(() => {
@@ -159,7 +187,7 @@ const Game: React.FC = () => {
     });
     setPlayers(newPlayers);
     gameLogicRef.current = new GameLogic();
-    
+
     // Log game initialization
     gameLogger.log("GAME_START", `New game started with ${numPlayers} players`);
   };
@@ -177,7 +205,26 @@ const Game: React.FC = () => {
   const handleEndTurn = () => {
     const oldPlayerIndex = currentPlayerIndex;
     const oldRound = currentRoundNumber;
-    
+
+    // Deduct current turn spending from the current player's balance
+    if (currentTurnSpending > 0) {
+      const currentPlayer = players[currentPlayerIndex];
+      if (currentPlayer) {
+        currentPlayer.updateBalance(-currentTurnSpending); // Subtract spending from balance
+        setPlayers((prev) =>
+          prev ? prev.map((p) => (p.getId() === currentPlayer.getId() ? currentPlayer : p)) : []
+        );
+        
+        gameLogger.log(
+          "BALANCE_UPDATE",
+          `Deducted $${currentTurnSpending} from ${currentPlayer.getName()}'s balance (new balance: $${currentPlayer.getBalance()})`,
+          currentPlayer.getId(),
+          currentPlayer.getName(),
+          currentPlayer.getColor()
+        );
+      }
+    }
+
     setCurrentTurnNumber((prev) => prev + 1);
     let newRound = currentRoundNumber;
 
@@ -189,6 +236,9 @@ const Game: React.FC = () => {
       setCurrentPlayerIndex((prev) => (prev + 1) % players.length);
     }
 
+    // Reset spending for new turn
+    setCurrentTurnSpending(0);
+
     // Set phase based on round - rounds 3+ start each player's turn with MOVE
     if (newRound >= 3) {
       setCurrentPhase(GamePhase.MOVE);
@@ -198,22 +248,23 @@ const Game: React.FC = () => {
     if (newRound > oldRound) {
       gameLogger.log("ROUND_START", `Round ${newRound} started`);
     }
-    
-    const nextPlayerIndex = currentPlayerIndex == players.length - 1 ? 0 : currentPlayerIndex + 1;
+
+    const nextPlayerIndex =
+      currentPlayerIndex == players.length - 1 ? 0 : currentPlayerIndex + 1;
     const nextPlayer = players[nextPlayerIndex];
     if (nextPlayer) {
       gameLogger.log(
-        "TURN_START", 
-        `Turn ${currentTurnNumber + 1} started`, 
+        "TURN_START",
+        `Turn ${currentTurnNumber + 1} started`,
         nextPlayer.getId(),
         nextPlayer.getName(),
         nextPlayer.getColor()
       );
-      
+
       if (newRound >= 3) {
         gameLogger.log(
-          "PHASE_START", 
-          `Move phase started`, 
+          "PHASE_START",
+          `Move phase started`,
           nextPlayer.getId(),
           nextPlayer.getName(),
           nextPlayer.getColor()
@@ -227,12 +278,12 @@ const Game: React.FC = () => {
 
   const handleAdvanceGame = () => {
     const currentPlayer = players[currentPlayerIndex];
-    
+
     if (currentRoundNumber <= 2) {
       // First 2 rounds: only BUILD phase
       gameLogger.log(
-        "TURN_END", 
-        `Turn ${currentTurnNumber} ended`, 
+        "TURN_END",
+        `Turn ${currentTurnNumber} ended`,
         currentPlayer.getId(),
         currentPlayer.getName(),
         currentPlayer.getColor()
@@ -242,16 +293,16 @@ const Game: React.FC = () => {
       // Rounds 3+: MOVE then BUILD phases
       if (currentPhase === GamePhase.MOVE) {
         gameLogger.log(
-          "PHASE_END", 
-          `Move phase ended`, 
+          "PHASE_END",
+          `Move phase ended`,
           currentPlayer.getId(),
           currentPlayer.getName(),
           currentPlayer.getColor()
         );
         setCurrentPhase(GamePhase.BUILD);
         gameLogger.log(
-          "PHASE_START", 
-          `Build phase started`, 
+          "PHASE_START",
+          `Build phase started`,
           currentPlayer.getId(),
           currentPlayer.getName(),
           currentPlayer.getColor()
@@ -259,8 +310,8 @@ const Game: React.FC = () => {
       } else {
         // End of BUILD phase - advance to next player's turn
         gameLogger.log(
-          "TURN_END", 
-          `Turn ${currentTurnNumber} ended`, 
+          "TURN_END",
+          `Turn ${currentTurnNumber} ended`,
           currentPlayer.getId(),
           currentPlayer.getName(),
           currentPlayer.getColor()
@@ -308,31 +359,70 @@ const Game: React.FC = () => {
       <div
         className="game-board"
         style={{
-          position: "relative",
+          display: "flex",
           width: "100%",
           height: "100vh",
         }}
       >
-        <div className="game-info">
-          <p>Number of Players: {numPlayers}</p>
-          <p>
-            Turn {currentTurnNumber} | Round {currentRoundNumber} | Phase:{" "}
-            {currentPhase} | Current Player:{" "}
+        <div
+          className="game-info"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            padding: "20px",
+            minWidth: "300px",
+            backgroundColor: "#f5f5f5",
+            borderRight: "2px solid #ccc",
+          }}
+        >
+          <h2>Game Info</h2>
+
+          <div style={{ marginBottom: "10px" }}>
+            <strong>Current Player:</strong>{" "}
             <span style={{ color: players[currentPlayerIndex].getColor() }}>
               {players[currentPlayerIndex].getName()}
             </span>
-          </p>
+          </div>
+          <div style={{ marginBottom: "10px" }}>
+            <strong>Phase:</strong> {currentPhase}
+          </div>
+          <div style={{ marginBottom: "20px" }}>
+            <strong>Spent this turn:</strong>{" "}
+            <span
+              style={{
+                color:
+                  currentTurnSpending >= MAX_TURN_SPENDING * 0.8
+                    ? "#ff6b6b"
+                    : currentTurnSpending >= MAX_TURN_SPENDING * 0.6
+                    ? "#ffa726"
+                    : "black",
+                fontWeight: "bold",
+              }}
+            >
+              ${currentTurnSpending} / ${MAX_TURN_SPENDING}
+            </span>
+          </div>
+          <div style={{ marginBottom: "10px" }}>
+            <strong>Turn:</strong> {currentTurnNumber}
+          </div>
+          <div style={{ marginBottom: "10px" }}>
+            <strong>Round:</strong> {currentRoundNumber}
+          </div>
+          <div style={{ marginBottom: "10px" }}>
+            <strong>Total Players:</strong> {numPlayers}
+          </div>
           <button
             onClick={handleAdvanceGame}
             style={{
-              margin: "10px",
-              padding: "5px 10px",
+              padding: "10px 15px",
               backgroundColor:
                 players[currentPlayerIndex]?.getColor() || "#ccc",
               color: "white",
               border: "none",
-              borderRadius: "3px",
+              borderRadius: "5px",
               cursor: "pointer",
+              fontSize: "14px",
+              fontWeight: "bold",
             }}
           >
             {currentRoundNumber <= 2
@@ -341,27 +431,39 @@ const Game: React.FC = () => {
               ? "End Move Phase"
               : "End Build Phase"}
           </button>
+          
+          <div style={{ marginTop: "20px" }}>
+            <UI
+              playerData={players}
+              currentPlayerIndex={currentPlayerIndex}
+              endTurn={handleEndTurn}
+              updatePlayerBalance={updatePlayerBalance}
+            />
+          </div>
+          
+          <div style={{ marginTop: "20px" }}>
+            <GameLog />
+          </div>
         </div>
-        <Board
-          width={boardWidth}
-          height={boardHeight}
-          mountainProbability={mountainProbability}
-          players={players}
-          currentPlayerIndex={currentPlayerIndex}
-          currentRound={currentRoundNumber}
-          currentTurn={currentTurnNumber}
-          currentPhase={currentPhase}
-          onAdvanceGame={handleAdvanceGame}
-          mileposts={mileposts}
-          loopPoints={loopPoints}
-        />
-        <GameLog />
-        <UI
-          playerData={players}
-          currentPlayerIndex={currentPlayerIndex}
-          endTurn={handleEndTurn}
-          updatePlayerBalance={updatePlayerBalance}
-        />
+
+        <div style={{ flex: 1, position: "relative" }}>
+          <Board
+            width={boardWidth}
+            height={boardHeight}
+            mountainProbability={mountainProbability}
+            players={players}
+            currentPlayerIndex={currentPlayerIndex}
+            currentRound={currentRoundNumber}
+            currentTurn={currentTurnNumber}
+            currentPhase={currentPhase}
+            onAdvanceGame={handleAdvanceGame}
+            mileposts={mileposts}
+            loopPoints={loopPoints}
+            currentTurnSpending={currentTurnSpending}
+            maxTurnSpending={MAX_TURN_SPENDING}
+            onSpendingChange={setCurrentTurnSpending}
+          />
+        </div>
       </div>
     );
   }

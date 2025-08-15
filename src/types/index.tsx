@@ -12,12 +12,13 @@ export interface MilepostProps {
   yCoord: number;
   selected: boolean;
   color: string;
-  isMountain?: boolean; // Optional property for mountain mileposts
-  onClick?: () => void; // Optional click handler
-  isClickable?: boolean; // Optional property to indicate if milepost is clickable
-  onPointerEnter?: () => void; // Optional hover enter handler
-  onPointerLeave?: () => void; // Optional hover leave handler
-  isPreviewTarget?: boolean; // Optional property to indicate if this is a preview target
+  isMountain: boolean; // Optional property for mountain mileposts
+  onClick: () => void; // Optional click handler
+  isClickable: boolean; // Optional property to indicate if milepost is clickable
+  onPointerEnter: () => void; // Optional hover enter handler
+  onPointerLeave: () => void; // Optional hover leave handler
+  isPreviewTarget: boolean; // Optional property to indicate if milepost is preview target
+  cost: number; // Cost to connect to this milepost
 }
 
 export type LineCoordinates = {

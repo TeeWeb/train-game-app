@@ -47,7 +47,7 @@ const Milepost: React.FC<MilepostProps> = ({
         onPointerEnter={onPointerEnter}
         onPointerLeave={onPointerLeave}
       >
-        <sphereGeometry args={[size * 1.5, 8, 8]} />
+        <sphereGeometry args={[2.5, 8, 8]} />
         <meshBasicMaterial transparent opacity={0} />
       </mesh>
       

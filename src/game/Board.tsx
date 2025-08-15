@@ -61,6 +61,9 @@ interface BoardProps {
   onAdvanceGame: () => void;
   mileposts: Omit<MilepostProps, "onClick">[];
   loopPoints: [number, number][];
+  currentTurnSpending: number;
+  maxTurnSpending: number;
+  onSpendingChange: (newSpending: number) => void;
 }
 
 const Board: React.FC<BoardProps> = ({
@@ -75,6 +78,9 @@ const Board: React.FC<BoardProps> = ({
   onAdvanceGame,
   mileposts: baseMileposts,
   loopPoints,
+  currentTurnSpending,
+  maxTurnSpending,
+  onSpendingChange,
 }) => {
   // Local UI state only
   const [selectedMilepostIndex, setSelectedMilepostIndex] = useState<
@@ -84,6 +90,7 @@ const Board: React.FC<BoardProps> = ({
     number | null
   >(null);
   const [tracks, setTracks] = useState<TrackLine[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Camera position state
   const [cameraX, setCameraX] = useState<number>(width / 2);
@@ -131,15 +138,15 @@ const Board: React.FC<BoardProps> = ({
       const currentPlayer = players[currentPlayerIndex];
       if (!currentPlayer) return;
 
-      gameLogger.log(
-        "MILEPOST_CLICK",
-        `Clicked milepost ${clickedIndex} at (${
-          baseMileposts[clickedIndex]?.xCoord?.toFixed(0) || "unknown"
-        }, ${baseMileposts[clickedIndex]?.yCoord?.toFixed(0) || "unknown"})`,
-        currentPlayer.getId(),
-        currentPlayer.getName(),
-        currentPlayer.getColor()
-      );
+      // gameLogger.log(
+      //   "MILEPOST_CLICK",
+      //   `Clicked milepost ${clickedIndex} at (${
+      //     baseMileposts[clickedIndex]?.xCoord?.toFixed(0) || "unknown"
+      //   }, ${baseMileposts[clickedIndex]?.yCoord?.toFixed(0) || "unknown"})`,
+      //   currentPlayer.getId(),
+      //   currentPlayer.getName(),
+      //   currentPlayer.getColor()
+      // );
 
       if (currentPhase !== GamePhase.BUILD) {
         gameLogger.log(
@@ -194,21 +201,53 @@ const Board: React.FC<BoardProps> = ({
         const dy = startMilepost.yCoord - endMilepost.yCoord;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        gameLogger.log(
-          "DISTANCE_CHECK",
-          `Distance from ${selectedMilepostIndex} to ${clickedIndex}: ${distance.toFixed(
-            1
-          )} (max: ${HORIZONTAL_SPACING})`,
-          currentPlayer.getId(),
-          currentPlayer.getName(),
-          currentPlayer.getColor()
-        );
+        // gameLogger.log(
+        //   "DISTANCE_CHECK",
+        //   `Distance from ${selectedMilepostIndex} to ${clickedIndex}: ${distance.toFixed(
+        //     1
+        //   )} (max: ${HORIZONTAL_SPACING})`,
+        //   currentPlayer.getId(),
+        //   currentPlayer.getName(),
+        //   currentPlayer.getColor()
+        // );
 
         // Check if this is a valid connection (use same logic as isValidTrackDistance)
-        const isValidConnection = isValidTrackDistance(selectedMilepostIndex, clickedIndex);
+        const isValidConnection = isValidTrackDistance(
+          selectedMilepostIndex,
+          clickedIndex
+        );
 
         if (isValidConnection) {
-          // Valid distance - build track
+          // Calculate track cost based on destination milepost type
+          const trackCost = endMilepost.cost || 1; // Use cost from milepost, default to 1
+          const newSpending = currentTurnSpending + trackCost;
+
+          // Debug: Log cost calculation
+          console.log(
+            `Building track to milepost ${clickedIndex}: isMountain=${endMilepost.isMountain}, cost=$${endMilepost.cost}, trackCost=$${trackCost}`
+          );
+
+          // Check if spending limit would be exceeded
+          if (newSpending > maxTurnSpending) {
+            gameLogger.log(
+              "BUILD_ERROR",
+              `Cannot build track: cost $${trackCost} would exceed turn limit ($${currentTurnSpending} / $${maxTurnSpending})`,
+              currentPlayer.getId(),
+              currentPlayer.getName(),
+              currentPlayer.getColor()
+            );
+
+            // Show alert to user
+            alert(
+              `Cannot build track! This would cost $${trackCost} and exceed your limit of $${maxTurnSpending} for this turn. You have already spent $${currentTurnSpending} this turn.`
+            );
+
+            // Clear selection and return
+            setSelectedMilepostIndex(null);
+            return;
+          }
+
+          // Valid distance and cost - build track
           const newTrack: TrackLine = {
             start: { x: startMilepost.xCoord, y: startMilepost.yCoord },
             end: { x: endMilepost.xCoord, y: endMilepost.yCoord },
@@ -216,11 +255,14 @@ const Board: React.FC<BoardProps> = ({
             playerId: currentPlayer.getId(),
           };
 
+          // Update spending
+          onSpendingChange(newSpending);
+
           setTracks((prevTracks) => {
             const updatedTracks = [...prevTracks, newTrack];
             gameLogger.log(
               "TRACK_BUILT",
-              `Built track from ${selectedMilepostIndex} to ${clickedIndex} (total tracks: ${updatedTracks.length})`,
+              `Built track from ${selectedMilepostIndex} to ${clickedIndex} for $${trackCost} (total tracks: ${updatedTracks.length}, spending: $${newSpending} / $${maxTurnSpending})`,
               currentPlayer.getId(),
               currentPlayer.getName(),
               currentPlayer.getColor()
@@ -242,40 +284,44 @@ const Board: React.FC<BoardProps> = ({
           // Determine the reason for blocking
           let reason = "";
           if (distance > HORIZONTAL_SPACING) {
-            reason = `Track too long: ${distance.toFixed(1)} > ${HORIZONTAL_SPACING}`;
+            reason = `Track too long: ${distance.toFixed(
+              1
+            )} > ${HORIZONTAL_SPACING}`;
           } else if (Math.abs(dy) < 1) {
-            reason = `Horizontal connections not allowed (dy = ${Math.abs(dy).toFixed(1)})`;
+            reason = `Horizontal connections not allowed (dy = ${Math.abs(
+              dy
+            ).toFixed(1)})`;
           } else {
             // Check if track already exists
             const tolerance = 1;
-            const trackExists = tracks.some(track => {
+            const trackExists = tracks.some((track) => {
               const trackStartX = track.start.x;
               const trackStartY = track.start.y;
               const trackEndX = track.end.x;
               const trackEndY = track.end.y;
-              
-              const matchesForward = 
+
+              const matchesForward =
                 Math.abs(trackStartX - startMilepost.xCoord) < tolerance &&
                 Math.abs(trackStartY - startMilepost.yCoord) < tolerance &&
                 Math.abs(trackEndX - endMilepost.xCoord) < tolerance &&
                 Math.abs(trackEndY - endMilepost.yCoord) < tolerance;
-                
-              const matchesReverse = 
+
+              const matchesReverse =
                 Math.abs(trackStartX - endMilepost.xCoord) < tolerance &&
                 Math.abs(trackStartY - endMilepost.yCoord) < tolerance &&
                 Math.abs(trackEndX - startMilepost.xCoord) < tolerance &&
                 Math.abs(trackEndY - startMilepost.yCoord) < tolerance;
-                
+
               return matchesForward || matchesReverse;
             });
-            
+
             if (trackExists) {
               reason = `Track already exists between these mileposts`;
             } else {
               reason = `Invalid connection`;
             }
           }
-            
+
           gameLogger.log(
             "BUILD_BLOCKED",
             reason,
@@ -326,25 +372,25 @@ const Board: React.FC<BoardProps> = ({
       }
 
       // Check if a track already exists between these two mileposts
-      const trackExists = tracks.some(track => {
+      const trackExists = tracks.some((track) => {
         const trackStartX = track.start.x;
         const trackStartY = track.start.y;
         const trackEndX = track.end.x;
         const trackEndY = track.end.y;
-        
+
         // Check both directions (A->B and B->A)
-        const matchesForward = 
+        const matchesForward =
           Math.abs(trackStartX - startMilepost.xCoord) < tolerance &&
           Math.abs(trackStartY - startMilepost.yCoord) < tolerance &&
           Math.abs(trackEndX - endMilepost.xCoord) < tolerance &&
           Math.abs(trackEndY - endMilepost.yCoord) < tolerance;
-          
-        const matchesReverse = 
+
+        const matchesReverse =
           Math.abs(trackStartX - endMilepost.xCoord) < tolerance &&
           Math.abs(trackStartY - endMilepost.yCoord) < tolerance &&
           Math.abs(trackEndX - startMilepost.xCoord) < tolerance &&
           Math.abs(trackEndY - startMilepost.yCoord) < tolerance;
-          
+
         return matchesForward || matchesReverse;
       });
 
@@ -453,11 +499,22 @@ const Board: React.FC<BoardProps> = ({
           currentPlayer.getColor()
         );
       }
-      
+
       setSelectedMilepostIndex(null);
       setHoveredMilepostIndex(null);
     }
   }, [currentPlayerIndex]); // Only trigger when player changes
+
+  // Handle loading state - set to false once mileposts are available
+  useEffect(() => {
+    if (baseMileposts && baseMileposts.length > 0) {
+      // Add a small delay to show the loading animation
+      const timer = setTimeout(() => {
+        setIsLoading(false);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [baseMileposts]);
 
   // WASD keyboard movement
   useEffect(() => {
@@ -598,7 +655,60 @@ const Board: React.FC<BoardProps> = ({
   }, []);
 
   return (
-    <div>
+    <div style={{ position: "relative" }}>
+      {/* CSS for loading animation */}
+      <style>
+        {`
+          @keyframes pulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 1; }
+            100% { opacity: 0.4; }
+          }
+          @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+          }
+          .loading-dots::after {
+            content: '';
+            animation: dots 2s infinite;
+          }
+        `}
+      </style>
+
+      {/* Loading overlay */}
+      {isLoading && (
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: `${width}px`,
+            height: `${height}px`,
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1000,
+            border: "2px solid black",
+          }}
+        >
+          <div
+            style={{
+              color: "white",
+              fontSize: "24px",
+              fontWeight: "bold",
+              textAlign: "center",
+              animation: "pulse 2s infinite",
+            }}
+            className="loading-dots"
+          >
+            Loading game board
+          </div>
+        </div>
+      )}
+
       <Canvas
         id="gameCanvas"
         ref={canvasRef}
@@ -668,13 +778,15 @@ const Board: React.FC<BoardProps> = ({
           <meshStandardMaterial color="#fff" />
         </mesh>
         <axesHelper args={[cameraZ]} />
-        {mileposts.map((props, index) =>
-          props.isMountain ? (
-            <MountainMilepost key={index} {...props} />
-          ) : (
-            <Milepost key={index} {...props} />
-          )
-        )}
+        {/* Only render mileposts when not loading */}
+        {!isLoading &&
+          mileposts.map((props, index) =>
+            props.isMountain ? (
+              <MountainMilepost key={index} {...props} />
+            ) : (
+              <Milepost key={index} {...props} />
+            )
+          )}
       </Canvas>
       <div style={{ position: "absolute" }}>
         x: {cursorPosition.x.toFixed(2)}, y: {cursorPosition.y.toFixed(2)}
