@@ -70,13 +70,14 @@ const Board: React.FC<BoardProps> = ({
     numPoints: number = 120,
     areaRatio: number = 0.65
   ): [number, number][] {
-    const cx = (width - HORIZONTAL_SPACING * 2) / 2;
-    const cy = (height - VERTICAL_SPACING * 2) / 2;
+    // Set up center points
+    const cx = width / 2;
+    const cy = height / 2 - VERTICAL_SPACING * 10; // Adjust center to account for vertical spacing
     // Target radius for desired area
     const targetArea = width * height * areaRatio;
     // Ensure the radius never exceeds the distance to the nearest edge
-    const maxRadiusX = Math.min(cx, width - cx);
-    const maxRadiusY = Math.min(cy, height - cy);
+    const maxRadiusX = Math.min(cx, width - cx - HORIZONTAL_SPACING);
+    const maxRadiusY = Math.min(cy, height - cy - VERTICAL_SPACING);
     // Use the smaller of calculated baseRadius and max allowed radius
     const baseRadius = Math.min(
       Math.sqrt(targetArea / Math.PI),
@@ -102,8 +103,8 @@ const Board: React.FC<BoardProps> = ({
           (baseRadius + noise) *
           (1 + 0.45 * Math.cos(theta - 0.5));
       // Clamp x and y to stay within the board
-      x = Math.max(HORIZONTAL_SPACING, Math.min(width, x));
-      y = Math.max(VERTICAL_SPACING, Math.min(height, y));
+      x = Math.max(HORIZONTAL_SPACING, Math.min(width - HORIZONTAL_SPACING, x));
+      y = Math.max(VERTICAL_SPACING, Math.min(height - VERTICAL_SPACING, y));
       points.push([x, y]);
     }
     // Ensure the loop is closed by making the last point equal to the first
@@ -115,7 +116,7 @@ const Board: React.FC<BoardProps> = ({
 
   // Memoize the loop points so they don't change every render
   const loopPoints = useMemo(
-    () => generateNoisyLoop(boardWidth, boardHeight, 120, 0.65),
+    () => generateNoisyLoop(boardWidth, boardHeight, 120, 0.5),
     [boardWidth, boardHeight]
   );
 
