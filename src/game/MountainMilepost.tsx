@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import type { MilepostProps } from "../types";
 
 const MountainMilepost: React.FC<MilepostProps> = ({
@@ -8,6 +8,9 @@ const MountainMilepost: React.FC<MilepostProps> = ({
   color,
   onClick,
   isClickable = true,
+  onPointerEnter,
+  onPointerLeave,
+  isPreviewTarget = false,
 }) => {
   const [x, setX] = useState(xCoord);
   const [y, setY] = useState(yCoord);
@@ -17,11 +20,14 @@ const MountainMilepost: React.FC<MilepostProps> = ({
 
   // Triangle geometry using three vertices
   const size = 3; // Size of the triangle
-  const triangleShape = [
-    [0, size, 0],
-    [-size, -size, 0],
-    [size, -size, 0],
-  ];
+  const actualSize = isPreviewTarget ? size * 2 : size; // Double size for preview target
+  
+  // Calculate triangle shape dynamically based on actualSize
+  const triangleShape = useMemo(() => [
+    [0, actualSize, 0],
+    [-actualSize, -actualSize, 0],
+    [actualSize, -actualSize, 0],
+  ], [actualSize]);
 
   const handleClick = () => {
     console.log("Mountain Milepost clicked at:", x, y);
@@ -35,16 +41,29 @@ const MountainMilepost: React.FC<MilepostProps> = ({
     setY(yCoord);
     setIsSelected(selected);
     setCurrentColor(color);
-    
+
     // Debug logging
     if (selected) {
-      console.log(`Mountain Milepost at (${xCoord}, ${yCoord}) selected with color: ${color}`);
+      console.log(
+        `Mountain Milepost at (${xCoord}, ${yCoord}) selected with color: ${color}`
+      );
     }
   }, [xCoord, yCoord, selected, color]);
 
   return (
     <group position={[xCoord, yCoord, 0]}>
-      <mesh onClick={handleClick}>
+      {/* Invisible larger sphere for easier clicking */}
+      <mesh
+        onClick={handleClick}
+        onPointerEnter={onPointerEnter}
+        onPointerLeave={onPointerLeave}
+      >
+        <sphereGeometry args={[size * 1.5, 8, 8]} />
+        <meshBasicMaterial transparent opacity={0} />
+      </mesh>
+
+      {/* Visible mountain triangle */}
+      <mesh key={actualSize}>
         <bufferGeometry>
           <bufferAttribute
             attach="attributes-position"
@@ -59,9 +78,11 @@ const MountainMilepost: React.FC<MilepostProps> = ({
           emissiveIntensity={selected ? 0.3 : 0}
         />
       </mesh>
+
+      {/* Selection ring */}
       {selected && (
         <mesh position={[0, 0, 0.1]}>
-          <ringGeometry args={[size + 1, size + 2, 16]} />
+          <ringGeometry args={[actualSize + 1, actualSize + 2, 16]} />
           <meshBasicMaterial color={color} transparent opacity={0.8} />
         </mesh>
       )}

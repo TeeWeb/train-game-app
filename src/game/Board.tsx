@@ -80,6 +80,9 @@ const Board: React.FC<BoardProps> = ({
   const [selectedMilepostIndex, setSelectedMilepostIndex] = useState<
     number | null
   >(null);
+  const [hoveredMilepostIndex, setHoveredMilepostIndex] = useState<
+    number | null
+  >(null);
   const [tracks, setTracks] = useState<TrackLine[]>([]);
 
   // Camera position state
@@ -195,13 +198,16 @@ const Board: React.FC<BoardProps> = ({
           "DISTANCE_CHECK",
           `Distance from ${selectedMilepostIndex} to ${clickedIndex}: ${distance.toFixed(
             1
-          )} (max: ${VERTICAL_SPACING})`,
+          )} (max: ${HORIZONTAL_SPACING})`,
           currentPlayer.getId(),
           currentPlayer.getName(),
           currentPlayer.getColor()
         );
 
-        if (distance <= HORIZONTAL_SPACING) {
+        // Check if this is a valid connection (use same logic as isValidTrackDistance)
+        const isValidConnection = isValidTrackDistance(selectedMilepostIndex, clickedIndex);
+
+        if (isValidConnection) {
           // Valid distance - build track
           const newTrack: TrackLine = {
             start: { x: startMilepost.xCoord, y: startMilepost.yCoord },
@@ -233,14 +239,51 @@ const Board: React.FC<BoardProps> = ({
             currentPlayer.getColor()
           );
         } else {
+          // Determine the reason for blocking
+          let reason = "";
+          if (distance > HORIZONTAL_SPACING) {
+            reason = `Track too long: ${distance.toFixed(1)} > ${HORIZONTAL_SPACING}`;
+          } else if (Math.abs(dy) < 1) {
+            reason = `Horizontal connections not allowed (dy = ${Math.abs(dy).toFixed(1)})`;
+          } else {
+            // Check if track already exists
+            const tolerance = 1;
+            const trackExists = tracks.some(track => {
+              const trackStartX = track.start.x;
+              const trackStartY = track.start.y;
+              const trackEndX = track.end.x;
+              const trackEndY = track.end.y;
+              
+              const matchesForward = 
+                Math.abs(trackStartX - startMilepost.xCoord) < tolerance &&
+                Math.abs(trackStartY - startMilepost.yCoord) < tolerance &&
+                Math.abs(trackEndX - endMilepost.xCoord) < tolerance &&
+                Math.abs(trackEndY - endMilepost.yCoord) < tolerance;
+                
+              const matchesReverse = 
+                Math.abs(trackStartX - endMilepost.xCoord) < tolerance &&
+                Math.abs(trackStartY - endMilepost.yCoord) < tolerance &&
+                Math.abs(trackEndX - startMilepost.xCoord) < tolerance &&
+                Math.abs(trackEndY - startMilepost.yCoord) < tolerance;
+                
+              return matchesForward || matchesReverse;
+            });
+            
+            if (trackExists) {
+              reason = `Track already exists between these mileposts`;
+            } else {
+              reason = `Invalid connection`;
+            }
+          }
+            
           gameLogger.log(
             "BUILD_BLOCKED",
-            `Track too long: ${distance.toFixed(1)} > ${VERTICAL_SPACING}`,
+            reason,
             currentPlayer.getId(),
             currentPlayer.getName(),
             currentPlayer.getColor()
           );
-          // If distance > VERTICAL_SPACING, do nothing (keep current selection)
+          // Keep current selection
         }
       }
     },
@@ -253,6 +296,97 @@ const Board: React.FC<BoardProps> = ({
     ]
   );
 
+  // Handle milepost hover for preview tracks
+  const handleMilepostHover = useCallback((hoveredIndex: number | null) => {
+    setHoveredMilepostIndex(hoveredIndex);
+  }, []);
+
+  // Check if a track between two mileposts would be valid
+  const isValidTrackDistance = useCallback(
+    (startIndex: number, endIndex: number) => {
+      if (startIndex === endIndex) return false;
+
+      const startMilepost = baseMileposts[startIndex];
+      const endMilepost = baseMileposts[endIndex];
+
+      if (!startMilepost || !endMilepost) return false;
+
+      const dx = startMilepost.xCoord - endMilepost.xCoord;
+      const dy = startMilepost.yCoord - endMilepost.yCoord;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // Check if distance is within allowed range
+      if (distance > HORIZONTAL_SPACING) return false;
+
+      // Prevent horizontal connections (same Y coordinate, different X)
+      // Allow a small tolerance for floating point precision
+      const tolerance = 1;
+      if (Math.abs(dy) < tolerance) {
+        return false; // This is a horizontal connection, block it
+      }
+
+      // Check if a track already exists between these two mileposts
+      const trackExists = tracks.some(track => {
+        const trackStartX = track.start.x;
+        const trackStartY = track.start.y;
+        const trackEndX = track.end.x;
+        const trackEndY = track.end.y;
+        
+        // Check both directions (A->B and B->A)
+        const matchesForward = 
+          Math.abs(trackStartX - startMilepost.xCoord) < tolerance &&
+          Math.abs(trackStartY - startMilepost.yCoord) < tolerance &&
+          Math.abs(trackEndX - endMilepost.xCoord) < tolerance &&
+          Math.abs(trackEndY - endMilepost.yCoord) < tolerance;
+          
+        const matchesReverse = 
+          Math.abs(trackStartX - endMilepost.xCoord) < tolerance &&
+          Math.abs(trackStartY - endMilepost.yCoord) < tolerance &&
+          Math.abs(trackEndX - startMilepost.xCoord) < tolerance &&
+          Math.abs(trackEndY - startMilepost.yCoord) < tolerance;
+          
+        return matchesForward || matchesReverse;
+      });
+
+      if (trackExists) return false; // Track already exists
+
+      return true; // Valid vertical or diagonal connection
+    },
+    [baseMileposts, tracks]
+  );
+
+  // Create preview track when hovering over valid destinations
+  const previewTrack = useMemo(() => {
+    if (
+      currentPhase !== GamePhase.BUILD ||
+      selectedMilepostIndex === null ||
+      hoveredMilepostIndex === null ||
+      !isValidTrackDistance(selectedMilepostIndex, hoveredMilepostIndex)
+    ) {
+      return null;
+    }
+
+    const startMilepost = baseMileposts[selectedMilepostIndex];
+    const endMilepost = baseMileposts[hoveredMilepostIndex];
+
+    if (!startMilepost || !endMilepost) return null;
+
+    return {
+      start: { x: startMilepost.xCoord, y: startMilepost.yCoord },
+      end: { x: endMilepost.xCoord, y: endMilepost.yCoord },
+      color: players[currentPlayerIndex]?.getColor() || "gray",
+      playerId: players[currentPlayerIndex]?.getId() || -1,
+    };
+  }, [
+    currentPhase,
+    selectedMilepostIndex,
+    hoveredMilepostIndex,
+    baseMileposts,
+    players,
+    currentPlayerIndex,
+    isValidTrackDistance,
+  ]);
+
   // Create enhanced mileposts with onClick handlers and selection state
   const mileposts = useMemo(() => {
     return baseMileposts.map((milepost, index) => ({
@@ -263,11 +397,17 @@ const Board: React.FC<BoardProps> = ({
           ? players[currentPlayerIndex].getColor()
           : "black",
       onClick: () => handleMilepostClick(index),
+      onPointerEnter: () => handleMilepostHover(index),
+      onPointerLeave: () => handleMilepostHover(null),
+      isPreviewTarget: hoveredMilepostIndex === index && previewTrack !== null,
     }));
   }, [
     baseMileposts,
     handleMilepostClick,
+    handleMilepostHover,
     selectedMilepostIndex,
+    hoveredMilepostIndex,
+    previewTrack,
     players,
     currentPlayerIndex,
   ]);
@@ -296,8 +436,28 @@ const Board: React.FC<BoardProps> = ({
       }
 
       setSelectedMilepostIndex(null);
+      setHoveredMilepostIndex(null); // Also clear hovered milepost
     }
   }, [currentPhase, players, currentPlayerIndex, selectedMilepostIndex]);
+
+  // Clear milepost selections when player turn changes
+  useEffect(() => {
+    if (selectedMilepostIndex !== null || hoveredMilepostIndex !== null) {
+      const currentPlayer = players[currentPlayerIndex];
+      if (currentPlayer) {
+        gameLogger.log(
+          "TURN_SELECTION_CLEARED",
+          `Milepost selection cleared for new player turn`,
+          currentPlayer.getId(),
+          currentPlayer.getName(),
+          currentPlayer.getColor()
+        );
+      }
+      
+      setSelectedMilepostIndex(null);
+      setHoveredMilepostIndex(null);
+    }
+  }, [currentPlayerIndex]); // Only trigger when player changes
 
   // WASD keyboard movement
   useEffect(() => {
@@ -473,6 +633,24 @@ const Board: React.FC<BoardProps> = ({
             transparent={false}
           />
         ))}
+
+        {/* Render preview track when hovering over valid destination */}
+        {previewTrack && (
+          <Line
+            points={[
+              new THREE.Vector3(
+                previewTrack.start.x,
+                previewTrack.start.y,
+                1.5
+              ),
+              new THREE.Vector3(previewTrack.end.x, previewTrack.end.y, 1.5),
+            ]}
+            color={previewTrack.color}
+            lineWidth={3}
+            transparent={true}
+            opacity={0.5}
+          />
+        )}
 
         <PerspectiveCamera
           makeDefault

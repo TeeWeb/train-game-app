@@ -15,6 +15,9 @@ export interface MilepostProps {
   isMountain?: boolean; // Optional property for mountain mileposts
   onClick?: () => void; // Optional click handler
   isClickable?: boolean; // Optional property to indicate if milepost is clickable
+  onPointerEnter?: () => void; // Optional hover enter handler
+  onPointerLeave?: () => void; // Optional hover leave handler
+  isPreviewTarget?: boolean; // Optional property to indicate if this is a preview target
 }
 
 export type LineCoordinates = {
