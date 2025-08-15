@@ -3,12 +3,14 @@ export default class Player {
   private color: string;
   private name: string;
   private balance: number = 0;
+  private position: number; // Milepost IDs
 
   constructor(id: number, color: string, name: string, balance: number = 0) {
     this.id = id;
     this.color = color;
     this.name = name;
     this.balance = balance;
+    this.position = null;
   }
 
   public getId(): number {
@@ -27,15 +29,15 @@ export default class Player {
     return this.balance;
   }
 
-  public setBalance(amount: number): void {
-    this.balance = amount;
+  public updateBalance(amount: number): void {
+    this.balance = this.balance + amount;
   }
 
-  public addToBalance(amount: number): void {
-    this.balance += amount;
+  public getPosition(): number {
+    return this.position;
   }
 
-  public subtractFromBalance(amount: number): void {
-    this.balance -= amount;
+  public setPosition(position: number): void {
+    this.position = position;
   }
 }

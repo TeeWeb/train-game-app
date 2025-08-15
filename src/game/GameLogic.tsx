@@ -1,17 +1,14 @@
 import Line from "./Line";
 import type Milepost from "./Milepost";
 import Board from "./Board";
+import Player from "./Player";
 
 export default class GameLogic {
   private selectedDots: Milepost[] = [];
   private lines: Line[] = [];
-  private board: Board;
-
-  constructor(board: Board) {
-    this.board = board;
-  }
 
   public selectDot(dot: Milepost): void {
+    console.log("Selecting dot:", dot);
     if (this.isDotSelectable(dot)) {
       this.selectedDots.push(dot);
       this.checkForLine();
@@ -31,6 +28,7 @@ export default class GameLogic {
       } else {
         this.resetSelection();
       }
+      console.log("Lines:", this.lines);
     }
   }
 
@@ -48,6 +46,15 @@ export default class GameLogic {
   }
 
   public getSelectedDots(): Milepost[] {
+    console.log("Selected Dots:", this.selectedDots);
     return this.selectedDots;
+  }
+
+  public checkForGameEnd(players: Player[]): Player {
+    for (const player of players) {
+      if (player.getBalance() >= 250) {
+        return player; // Game ends if any player runs out of balance
+      }
+    }
   }
 }

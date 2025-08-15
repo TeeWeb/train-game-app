@@ -1,19 +1,50 @@
-import Milepost from "./Milepost";
+import React, { useEffect, useState } from "react";
+import type { MilepostProps } from "../types";
 
-export default class MountainMilepost extends Milepost {
-  constructor(x: number, y: number) {
-    super(x, y);
-    this.cost = 2;
-  }
+const MountainMilepost: React.FC<MilepostProps> = ({
+  xCoord,
+  yCoord,
+  selected,
+  color,
+}) => {
+  const [x, setX] = useState(xCoord);
+  const [y, setY] = useState(yCoord);
+  const [isSelected, setIsSelected] = useState(selected);
+  const [cost, setCost] = useState(1);
+  const [currentColor, setCurrentColor] = useState(color);
 
-  draw(ctx: CanvasRenderingContext2D) {
-    const size = 6; // Length from center to a vertex
-    ctx.beginPath();
-    ctx.moveTo(this.x, this.y - size); // Top vertex
-    ctx.lineTo(this.x - size * Math.sin(Math.PI / 3), this.y + size / 2); // Bottom left
-    ctx.lineTo(this.x + size * Math.sin(Math.PI / 3), this.y + size / 2); // Bottom right
-    ctx.closePath();
-    ctx.fillStyle = this.selected ? "orange" : "brown";
-    ctx.fill();
-  }
-}
+  // Triangle geometry using three vertices
+  const size = 5; // Size of the triangle
+  const triangleShape = [
+    [0, size, 0],
+    [-size, -size, 0],
+    [size, -size, 0],
+  ];
+
+  useEffect(() => {
+    setX(xCoord);
+    setY(yCoord);
+    setIsSelected(selected);
+  }, [xCoord, yCoord, selected]);
+
+  const toggleSelect = () => {
+    console.log("Toggling selection for MountainMilepost at:", x, y);
+    setIsSelected(!isSelected);
+  };
+
+  return (
+    <mesh position={[xCoord, yCoord, 0]}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          array={new Float32Array(triangleShape.flat())}
+          count={3}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <meshStandardMaterial color={currentColor} />
+    </mesh>
+  );
+};
+
+export default MountainMilepost;

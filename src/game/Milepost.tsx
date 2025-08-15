@@ -1,29 +1,43 @@
-export default class Milepost {
-  x: number;
-  y: number;
-  selected: boolean;
-  cost: number;
+import { useEffect, useState } from "react";
+import type { MilepostProps } from "../types";
 
-  constructor(x: number, y: number) {
-    this.x = x;
-    this.y = y;
-    this.selected = false;
-    this.cost = 1; // Default cost, can be set later
-  }
+const Milepost: React.FC<MilepostProps> = ({
+  xCoord,
+  yCoord,
+  selected = false,
+  color,
+}) => {
+  const [x, setX] = useState(xCoord);
+  const [y, setY] = useState(yCoord);
+  const [isSelected, setIsSelected] = useState(selected);
+  const [cost, setCost] = useState(1);
+  const [currentColor, setCurrentcolor] = useState(color);
 
-  draw(ctx: CanvasRenderingContext2D) {
+  const draw = (ctx: CanvasRenderingContext2D) => {
     ctx.beginPath();
-    ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
-    ctx.fillStyle = this.selected ? "orange" : "black";
+    ctx.arc(x, y, 2, 0, Math.PI * 2);
+    ctx.fillStyle = selected ? "orange" : "black";
     ctx.fill();
     ctx.closePath();
-  }
+  };
 
-  toggleSelect() {
-    this.selected = !this.selected;
-  }
+  const toggleSelect = () => {
+    console.log("Toggling selection for Milepost at:", x, y);
+    selected = !selected;
+  };
 
-  isSelected(): boolean {
-    return this.selected;
-  }
-}
+  useEffect(() => {
+    setX(xCoord);
+    setY(yCoord);
+    setIsSelected(selected);
+  }, [xCoord, yCoord, selected]);
+
+  return (
+    <mesh position={[x, y, 0]} onClick={toggleSelect}>
+      <sphereGeometry args={[3, 3, 3]} />
+      <meshStandardMaterial color={currentColor} />
+    </mesh>
+  );
+};
+
+export default Milepost;
