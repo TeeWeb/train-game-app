@@ -61,6 +61,8 @@ interface BoardProps {
   onAdvanceGame: () => void;
   mileposts: Omit<MilepostProps, "onClick">[];
   loopPoints: [number, number][];
+  lakes: [number, number][][]; // Add lakes prop
+  rivers: [number, number][][]; // Add rivers prop
   currentTurnSpending: number;
   maxTurnSpending: number;
   onSpendingChange: (newSpending: number) => void;
@@ -78,6 +80,8 @@ const Board: React.FC<BoardProps> = ({
   onAdvanceGame,
   mileposts: baseMileposts,
   loopPoints,
+  lakes, // Add lakes prop
+  rivers, // Add rivers prop
   currentTurnSpending,
   maxTurnSpending,
   onSpendingChange,
@@ -131,6 +135,25 @@ const Board: React.FC<BoardProps> = ({
     () => loopPoints.map(([x, y]) => new THREE.Vector3(x, y, 2)), // z=2 to draw above the board
     [loopPoints]
   );
+
+  // Convert lakes to THREE.Vector3[]
+  const lakesThreePoints = useMemo(
+    () =>
+      lakes.map((lake) => lake.map(([x, y]) => new THREE.Vector3(x, y, 1.5))), // z=1.5 to draw above board but below boundary
+    [lakes]
+  );
+
+  // Convert rivers to THREE.Vector3[]
+  const riversThreePoints = useMemo(() => {
+    console.log(`DEBUG Board: Received ${rivers.length} rivers:`, rivers);
+    const converted = rivers.map((river) =>
+      river.map(([x, y]) => new THREE.Vector3(x, y, 1.3))
+    ); // z=1.3 to draw above board but below lakes
+    console.log(
+      `DEBUG Board: Converted to ${converted.length} river point arrays`
+    );
+    return converted;
+  }, [rivers]);
 
   // Handle milepost selection and track building
   const handleMilepostClick = useCallback(
@@ -729,6 +752,28 @@ const Board: React.FC<BoardProps> = ({
           lineWidth={4} // Bold line
           transparent={false}
         />
+
+        {/* Render Lakes */}
+        {lakesThreePoints.map((lakePoints, index) => (
+          <Line
+            key={`lake-${index}`}
+            points={lakePoints}
+            color="#4A90E2" // Blue color for lakes
+            lineWidth={3}
+            transparent={false}
+          />
+        ))}
+
+        {/* Render Rivers */}
+        {riversThreePoints.map((riverPoints, index) => (
+          <Line
+            key={`river-${index}`}
+            points={riverPoints}
+            color="#1E88E5" // Darker blue color for rivers
+            lineWidth={2}
+            transparent={false}
+          />
+        ))}
 
         {/* Render all built tracks */}
         {tracks.map((track, index) => (
