@@ -24,7 +24,8 @@ import {
   addRiverMeandering,
   reduceSharpAngles,
 } from "../utils/pathFinder";
-import type { MilepostProps } from "../types";
+import type { MilepostProps, CitySize, City, CityMilepost, Good } from "../types";
+import { CitySize as CitySizeEnum } from "../types";
 
 const COLOR_OPTIONS = [
   { name: "Green", value: "#228B22" },
@@ -37,6 +38,24 @@ const COLOR_OPTIONS = [
   { name: "Crimson", value: "#DC143C" },
   { name: "Navy Blue", value: "#000080" },
   { name: "Brown", value: "#8B4513" },
+];
+
+const CITY_NAMES = [
+  "New Metropolis", "Port Haven", "Mountain View", "Riverside", "Capitol City",
+  "Goldfield", "Iron Ridge", "Cedar Falls", "Stone Bridge", "Sunset Valley",
+  "Crystal Bay", "Pine Grove", "Silver Creek", "Oak Harbor", "Maple Junction",
+  "Thunder Peak", "Green Valley", "Blue Lake", "Red Rock", "Golden Gate"
+];
+
+const GOODS_DATA: Good[] = [
+  { id: "cattle", name: "Cattle", value: 3, color: "#8B4513" },
+  { id: "grain", name: "Grain", value: 2, color: "#DAA520" },
+  { id: "coal", name: "Coal", value: 4, color: "#2F2F2F" },
+  { id: "iron", name: "Iron", value: 5, color: "#696969" },
+  { id: "lumber", name: "Lumber", value: 3, color: "#228B22" },
+  { id: "oil", name: "Oil", value: 6, color: "#000000" },
+  { id: "manufactured", name: "Manufactured Goods", value: 7, color: "#8A2BE2" },
+  { id: "textiles", name: "Textiles", value: 4, color: "#FF69B4" },
 ];
 
 // Constants for milepost generation
@@ -62,6 +81,7 @@ const Game: React.FC = () => {
     numRivers: 5,
     numLakes: 3,
     mountainDensity: 0.15,
+    numMajorCities: 2,
   });
   const [playerConfigs, setPlayerConfigs] = useState<
     Array<{ name: string; color: string }>
@@ -316,6 +336,251 @@ const Game: React.FC = () => {
     }
     
     return true;
+  };
+
+  // Generate cities with different sizes
+  const generateCities = (
+    boundaryPoints: [number, number][],
+    lakes: [number, number][][],
+    numMajorCities: number
+  ): City[] => {
+    const cities: City[] = [];
+    const usedNames = new Set<string>();
+    let cityIdCounter = 0;
+
+    // Helper function to get a random unused city name
+    const getRandomCityName = (): string => {
+      const availableNames = CITY_NAMES.filter(name => !usedNames.has(name));
+      if (availableNames.length === 0) {
+        return `City ${cityIdCounter}`;
+      }
+      const name = availableNames[Math.floor(Math.random() * availableNames.length)];
+      usedNames.add(name);
+      return name;
+    };
+
+    // Helper function to get random goods for a city
+    const getRandomGoods = (citySize: CitySize): Good[] => {
+      const numGoods = citySize === CitySizeEnum.MAJOR ? 3 : citySize === CitySizeEnum.MEDIUM ? 2 : 1;
+      const shuffledGoods = [...GOODS_DATA].sort(() => Math.random() - 0.5);
+      return shuffledGoods.slice(0, numGoods);
+    };
+
+    // Helper function to snap coordinates to milepost grid
+    const snapToGrid = (x: number, y: number): [number, number] => {
+      // Calculate which row and column this would be on the milepost grid
+      const row = Math.round((y - VERTICAL_SPACING) / VERTICAL_SPACING);
+      const isOddRow = row % 2 === 1;
+      const baseX = HORIZONTAL_SPACING / 2 + (isOddRow ? HORIZONTAL_SPACING / 2 : 0);
+      const col = Math.round((x - baseX) / HORIZONTAL_SPACING);
+      
+      // Calculate the actual grid position
+      const gridX = col * HORIZONTAL_SPACING + baseX;
+      const gridY = row * VERTICAL_SPACING + VERTICAL_SPACING;
+      
+      return [gridX, gridY];
+    };
+
+    // Helper function to check if a point is valid for city placement
+    const isValidCityLocation = (x: number, y: number, existingCities: City[]): boolean => {
+      // Check if inside boundary
+      if (!isPointInPolygon(x, y, boundaryPoints)) {
+        return false;
+      }
+
+      // Check if not in lake
+      if (isPointInAnyLake(x, y, lakes)) {
+        return false;
+      }
+
+      // Check minimum distance from existing cities (use grid spacing)
+      const minDistance = HORIZONTAL_SPACING * 2; // Minimum 2 grid units between cities
+      for (const city of existingCities) {
+        for (const milepost of city.mileposts) {
+          const distance = Math.sqrt(
+            Math.pow(x - milepost.xCoord, 2) + Math.pow(y - milepost.yCoord, 2)
+          );
+          if (distance < minDistance) {
+            return false;
+          }
+        }
+      }
+
+      return true;
+    };
+
+    // Generate potential grid positions
+    const numRows = Math.floor(boardHeight / VERTICAL_SPACING);
+    const numCols = Math.floor(boardWidth / HORIZONTAL_SPACING);
+    const gridPositions: [number, number][] = [];
+
+    for (let row = 0; row < numRows; row++) {
+      for (let col = 0; col < numCols; col++) {
+        const y = row * VERTICAL_SPACING + VERTICAL_SPACING;
+        const x = col * HORIZONTAL_SPACING + HORIZONTAL_SPACING / 2 + (row % 2 === 1 ? HORIZONTAL_SPACING / 2 : 0);
+        
+        if (x < boardWidth && y < boardHeight) {
+          gridPositions.push([x, y]);
+        }
+      }
+    }
+
+    // Shuffle grid positions for random placement
+    const shuffledPositions = [...gridPositions].sort(() => Math.random() - 0.5);
+
+    // Generate MAJOR cities first
+    let positionIndex = 0;
+    for (let i = 0; i < numMajorCities; i++) {
+      let validLocationFound = false;
+      
+      while (positionIndex < shuffledPositions.length && !validLocationFound) {
+        const [centerX, centerY] = shuffledPositions[positionIndex];
+        positionIndex++;
+        
+        if (isValidCityLocation(centerX, centerY, cities)) {
+          // Create 4 mileposts in a grid pattern for major cities
+          const cityMileposts: CityMilepost[] = [];
+          const positions = [
+            [centerX - HORIZONTAL_SPACING/2, centerY - VERTICAL_SPACING/2],
+            [centerX + HORIZONTAL_SPACING/2, centerY - VERTICAL_SPACING/2],
+            [centerX - HORIZONTAL_SPACING/2, centerY + VERTICAL_SPACING/2],
+            [centerX + HORIZONTAL_SPACING/2, centerY + VERTICAL_SPACING/2]
+          ];
+          
+          // Snap all positions to grid and check validity
+          const snappedPositions = positions.map(([x, y]) => snapToGrid(x, y));
+          let allPositionsValid = true;
+          
+          for (const [x, y] of snappedPositions) {
+            if (!isValidCityLocation(x, y, cities)) {
+              allPositionsValid = false;
+              break;
+            }
+          }
+          
+          if (allPositionsValid) {
+            const city: City = {
+              id: `city_${cityIdCounter++}`,
+              name: getRandomCityName(),
+              size: CitySizeEnum.MAJOR,
+              mileposts: [],
+              goods: getRandomGoods(CitySizeEnum.MAJOR)
+            };
+
+            for (const [x, y] of snappedPositions) {
+              const cityMilepost: CityMilepost = {
+                xCoord: x,
+                yCoord: y,
+                selected: false,
+                color: "red",
+                isMountain: false,
+                isClickable: true,
+                cost: 5,
+                onPointerEnter: () => {},
+                onPointerLeave: () => {},
+                isPreviewTarget: false,
+                onClick: () => {},
+                city: city,
+                connectedPlayers: [],
+                maxConnections: Infinity
+              };
+              cityMileposts.push(cityMilepost);
+            }
+            
+            city.mileposts = cityMileposts;
+            cities.push(city);
+            validLocationFound = true;
+          }
+        }
+      }
+    }
+
+    // Generate MEDIUM cities (3x the number of major cities)
+    const numMediumCities = numMajorCities * 3;
+    for (let i = 0; i < numMediumCities; i++) {
+      let validLocationFound = false;
+      
+      while (positionIndex < shuffledPositions.length && !validLocationFound) {
+        const [x, y] = shuffledPositions[positionIndex];
+        positionIndex++;
+        
+        if (isValidCityLocation(x, y, cities)) {
+          const city: City = {
+            id: `city_${cityIdCounter++}`,
+            name: getRandomCityName(),
+            size: CitySizeEnum.MEDIUM,
+            mileposts: [],
+            goods: getRandomGoods(CitySizeEnum.MEDIUM)
+          };
+
+          const cityMilepost: CityMilepost = {
+            xCoord: x,
+            yCoord: y,
+            selected: false,
+            color: "red",
+            isMountain: false,
+            isClickable: true,
+            cost: 3,
+            onPointerEnter: () => {},
+            onPointerLeave: () => {},
+            isPreviewTarget: false,
+            onClick: () => {},
+            city: city,
+            connectedPlayers: [],
+            maxConnections: 4
+          };
+          
+          city.mileposts = [cityMilepost];
+          cities.push(city);
+          validLocationFound = true;
+        }
+      }
+    }
+
+    // Generate SMALL cities (3x the number of major cities)
+    const numSmallCities = numMajorCities * 3;
+    for (let i = 0; i < numSmallCities; i++) {
+      let validLocationFound = false;
+      
+      while (positionIndex < shuffledPositions.length && !validLocationFound) {
+        const [x, y] = shuffledPositions[positionIndex];
+        positionIndex++;
+        
+        if (isValidCityLocation(x, y, cities)) {
+          const city: City = {
+            id: `city_${cityIdCounter++}`,
+            name: getRandomCityName(),
+            size: CitySizeEnum.SMALL,
+            mileposts: [],
+            goods: getRandomGoods(CitySizeEnum.SMALL)
+          };
+
+          const cityMilepost: CityMilepost = {
+            xCoord: x,
+            yCoord: y,
+            selected: false,
+            color: "red",
+            isMountain: false,
+            isClickable: true,
+            cost: 3,
+            onPointerEnter: () => {},
+            onPointerLeave: () => {},
+            isPreviewTarget: false,
+            onClick: () => {},
+            city: city,
+            connectedPlayers: [],
+            maxConnections: 3
+          };
+          
+          city.mileposts = [cityMilepost];
+          cities.push(city);
+          validLocationFound = true;
+        }
+      }
+    }
+
+    console.log(`Generated ${cities.length} cities: ${numMajorCities} major, ${numMediumCities} medium, ${numSmallCities} small`);
+    return cities;
   };
 
   // Generate rivers connecting boundary to interior or lake edges
@@ -910,11 +1175,20 @@ const Game: React.FC = () => {
   // Generate milepost coordinates
   const generateMilepostCoords = (
     loopPoints: [number, number][],
-    lakes: [number, number][][]
+    lakes: [number, number][][],
+    cities: City[]
   ): { x: number; y: number }[] => {
     const coords: { x: number; y: number }[] = [];
     const numRows = Math.floor(boardHeight / VERTICAL_SPACING);
     const numCols = Math.floor(boardWidth / HORIZONTAL_SPACING);
+
+    // Create a set of city milepost coordinates for fast lookup
+    const cityCoordinates = new Set<string>();
+    cities.forEach(city => {
+      city.mileposts.forEach(milepost => {
+        cityCoordinates.add(`${milepost.xCoord.toFixed(1)},${milepost.yCoord.toFixed(1)}`);
+      });
+    });
 
     for (let row = 0; row < numRows; row++) {
       for (let col = 0; col < numCols; col++) {
@@ -923,11 +1197,15 @@ const Game: React.FC = () => {
           col * HORIZONTAL_SPACING +
           HORIZONTAL_SPACING / 2 +
           (row % 2 === 1 ? HORIZONTAL_SPACING / 2 : 0);
+        
+        const coordKey = `${x.toFixed(1)},${y.toFixed(1)}`;
+        
         if (
           x < boardWidth &&
           y < boardHeight &&
           isPointInPolygon(x, y, loopPoints) &&
-          !isPointInAnyLake(x, y, lakes) // Check that milepost is not in any lake
+          !isPointInAnyLake(x, y, lakes) && // Check that milepost is not in any lake
+          !cityCoordinates.has(coordKey) // Check that this position is not occupied by a city milepost
         ) {
           coords.push({ x, y });
         }
@@ -960,6 +1238,16 @@ const Game: React.FC = () => {
     );
   }, [boardWidth, boardHeight, loopPoints, gameConfig.numLakes, configStep]);
 
+  // Generate cities
+  const cities = useMemo(() => {
+    if (configStep !== "game" || loopPoints.length === 0 || lakes.length === 0) return []; // Don't generate until game starts
+    return generateCities(
+      loopPoints,
+      lakes,
+      gameConfig.numMajorCities
+    );
+  }, [loopPoints, lakes, gameConfig.numMajorCities, configStep]);
+
   // Calculate base radius for river length constraints
   const baseRadius = useMemo(() => {
     if (configStep !== "game") return 0; // Don't calculate until game starts
@@ -971,9 +1259,9 @@ const Game: React.FC = () => {
 
   // Generate stable milepost data
   const mileposts = useMemo(() => {
-    if (configStep !== "game" || loopPoints.length === 0 || lakes.length === 0)
+    if (configStep !== "game" || loopPoints.length === 0 || lakes.length === 0 || cities.length === 0)
       return []; // Don't generate until game starts
-    const coords = generateMilepostCoords(loopPoints, lakes);
+    const coords = generateMilepostCoords(loopPoints, lakes, cities);
     const generatedMileposts = coords.map(({ x, y }) => {
       const isMountain = Math.random() < gameConfig.mountainDensity;
       return {
@@ -990,16 +1278,38 @@ const Game: React.FC = () => {
       };
     });
 
+    // Replace regular mileposts with city mileposts at overlapping coordinates
+    let allMileposts = [...generatedMileposts];
+    
+    cities.forEach(city => {
+      city.mileposts.forEach(cityMilepost => {
+        // Find and remove any regular milepost at the same coordinates
+        const tolerance = 1; // Small tolerance for coordinate matching
+        allMileposts = allMileposts.filter(regularMilepost => {
+          const dx = Math.abs(regularMilepost.xCoord - cityMilepost.xCoord);
+          const dy = Math.abs(regularMilepost.yCoord - cityMilepost.yCoord);
+          return dx > tolerance || dy > tolerance; // Keep if coordinates don't match
+        });
+        
+        // Add the city milepost
+        allMileposts.push({
+          ...cityMilepost,
+          isClickable: currentPhase === GamePhase.BUILD,
+        });
+      });
+    });
+
     // Debug: Log cost distribution
     const mountainCount = generatedMileposts.filter((m) => m.isMountain).length;
     const cost2Count = generatedMileposts.filter((m) => m.cost === 2).length;
     const lakesCount = lakes.length;
+    const citiesCount = cities.length;
     console.log(
-      `Generated ${generatedMileposts.length} mileposts: ${mountainCount} mountains, ${cost2Count} with cost=2, avoiding ${lakesCount} lakes`
+      `Generated ${generatedMileposts.length} regular mileposts: ${mountainCount} mountains, ${cost2Count} with cost=2, avoiding ${lakesCount} lakes and ${citiesCount} cities`
     );
 
-    return generatedMileposts;
-  }, [loopPoints, lakes, gameConfig.mountainDensity, currentPhase, configStep]);
+    return allMileposts;
+  }, [loopPoints, lakes, cities, gameConfig.mountainDensity, currentPhase, configStep]);
 
   // Generate rivers connecting boundary to interior/lakes (after mileposts are generated)
   const rivers = useMemo(() => {
@@ -1089,6 +1399,7 @@ const Game: React.FC = () => {
       numRivers: 5,
       numLakes: 3,
       mountainDensity: 0.15,
+      numMajorCities: 2,
     });
   };
 
@@ -1390,6 +1701,24 @@ const Game: React.FC = () => {
                 style={{ width: "100%" }}
               />
             </div>
+            <div>
+              <label style={{ display: "block", marginBottom: 5 }}>
+                Number of Major Cities: {gameConfig.numMajorCities}
+              </label>
+              <input
+                type="range"
+                min="1"
+                max="4"
+                value={gameConfig.numMajorCities}
+                onChange={(e) =>
+                  setGameConfig({
+                    ...gameConfig,
+                    numMajorCities: Number(e.target.value),
+                  })
+                }
+                style={{ width: "100%" }}
+              />
+            </div>
           </div>
         </div>
 
@@ -1537,6 +1866,7 @@ const Game: React.FC = () => {
             loopPoints={loopPoints}
             lakes={lakes}
             rivers={rivers}
+            cities={cities}
             currentTurnSpending={currentTurnSpending}
             maxTurnSpending={MAX_TURN_SPENDING}
             onSpendingChange={setCurrentTurnSpending}

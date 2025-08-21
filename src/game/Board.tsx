@@ -4,7 +4,8 @@ import { PerspectiveCamera, Line } from "@react-three/drei";
 import * as THREE from "three";
 
 import Milepost from "./Milepost";
-import type { MilepostProps } from "../types";
+import CityMilepost from "./CityMilepost";
+import type { MilepostProps, City, CityMilepost as CityMilepostType } from "../types";
 import MountainMilepost from "./MountainMilepost";
 import GameLogic from "./GameLogic";
 import Player from "./Player";
@@ -63,6 +64,7 @@ interface BoardProps {
   loopPoints: [number, number][];
   lakes: [number, number][][]; // Add lakes prop
   rivers: [number, number][][]; // Add rivers prop
+  cities: City[]; // Add cities prop
   currentTurnSpending: number;
   maxTurnSpending: number;
   onSpendingChange: (newSpending: number) => void;
@@ -82,6 +84,7 @@ const Board: React.FC<BoardProps> = ({
   loopPoints,
   lakes, // Add lakes prop
   rivers, // Add rivers prop
+  cities, // Add cities prop
   currentTurnSpending,
   maxTurnSpending,
   onSpendingChange,
@@ -223,16 +226,6 @@ const Board: React.FC<BoardProps> = ({
         const dx = startMilepost.xCoord - endMilepost.xCoord;
         const dy = startMilepost.yCoord - endMilepost.yCoord;
         const distance = Math.sqrt(dx * dx + dy * dy);
-
-        // gameLogger.log(
-        //   "DISTANCE_CHECK",
-        //   `Distance from ${selectedMilepostIndex} to ${clickedIndex}: ${distance.toFixed(
-        //     1
-        //   )} (max: ${HORIZONTAL_SPACING})`,
-        //   currentPlayer.getId(),
-        //   currentPlayer.getName(),
-        //   currentPlayer.getColor()
-        // );
 
         // Check if this is a valid connection (use same logic as isValidTrackDistance)
         const isValidConnection = isValidTrackDistance(
@@ -775,6 +768,39 @@ const Board: React.FC<BoardProps> = ({
           />
         ))}
 
+        {/* Render City Areas */}
+        {cities.map((city, index) => {
+          // Calculate city center from mileposts
+          const centerX = city.mileposts.reduce((sum, mp) => sum + mp.xCoord, 0) / city.mileposts.length;
+          const centerY = city.mileposts.reduce((sum, mp) => sum + mp.yCoord, 0) / city.mileposts.length;
+          
+          if (city.size === 'SMALL') {
+            // Circle shape for small cities (reduced radius by 50%)
+            return (
+              <mesh key={`city-${index}`} position={[centerX, centerY, 0.8]}>
+                <circleGeometry args={[7.5, 32]} />
+                <meshStandardMaterial color="#ff4444" transparent={true} opacity={0.3} />
+              </mesh>
+            );
+          } else if (city.size === 'MEDIUM') {
+            // Square shape for medium cities (reduced size by 50%)
+            return (
+              <mesh key={`city-${index}`} position={[centerX, centerY, 0.8]}>
+                <planeGeometry args={[15, 15]} />
+                <meshStandardMaterial color="#ff4444" transparent={true} opacity={0.3} />
+              </mesh>
+            );
+          } else {
+            // MAJOR cities: multi-milepost area (larger circle)
+            return (
+              <mesh key={`city-${index}`} position={[centerX, centerY, 0.8]}>
+                <circleGeometry args={[25, 32]} />
+                <meshStandardMaterial color="#ff4444" transparent={true} opacity={0.3} />
+              </mesh>
+            );
+          }
+        })}
+
         {/* Render all built tracks */}
         {tracks.map((track, index) => (
           <Line
@@ -825,13 +851,18 @@ const Board: React.FC<BoardProps> = ({
         <axesHelper args={[cameraZ]} />
         {/* Only render mileposts when not loading */}
         {!isLoading &&
-          mileposts.map((props, index) =>
-            props.isMountain ? (
-              <MountainMilepost key={index} {...props} />
-            ) : (
-              <Milepost key={index} {...props} />
-            )
-          )}
+          mileposts.map((props, index) => {
+            // Check if this is a city milepost by checking for the city property
+            const isCityMilepost = 'city' in props;
+            
+            if (isCityMilepost) {
+              return <CityMilepost key={index} {...(props as CityMilepostType)} />;
+            } else if (props.isMountain) {
+              return <MountainMilepost key={index} {...props} />;
+            } else {
+              return <Milepost key={index} {...props} />;
+            }
+          })}
       </Canvas>
       <div style={{ position: "absolute" }}>
         x: {cursorPosition.x.toFixed(2)}, y: {cursorPosition.y.toFixed(2)}

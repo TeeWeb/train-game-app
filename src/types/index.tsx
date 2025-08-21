@@ -21,6 +21,33 @@ export interface MilepostProps {
   cost: number; // Cost to connect to this milepost
 }
 
+export enum CitySize {
+  SMALL = "SMALL",
+  MEDIUM = "MEDIUM",
+  MAJOR = "MAJOR"
+}
+
+export interface Good {
+  id: string;
+  name: string;
+  value: number;
+  color: string;
+}
+
+export interface City {
+  id: string;
+  name: string;
+  size: CitySize;
+  mileposts: CityMilepost[];
+  goods: Good[];
+}
+
+export interface CityMilepost extends MilepostProps {
+  city: City;
+  connectedPlayers: Player[];
+  maxConnections: number;
+}
+
 export type LineCoordinates = {
   start: Milepost;
   end: Milepost;
