@@ -4,9 +4,7 @@ import { PerspectiveCamera, Line } from "@react-three/drei";
 import * as THREE from "three";
 
 import Milepost from "./Milepost";
-import CityMilepost from "./CityMilepost";
-import type { MilepostProps, City, CityMilepost as CityMilepostType } from "../types";
-import MountainMilepost from "./MountainMilepost";
+import type { MilepostProps, City } from "../types";
 import GameLogic from "./GameLogic";
 import Player from "./Player";
 import { gameLogger } from "../utils/gameLogger";
@@ -82,9 +80,9 @@ const Board: React.FC<BoardProps> = ({
   onAdvanceGame,
   mileposts: baseMileposts,
   loopPoints,
-  lakes, // Add lakes prop
-  rivers, // Add rivers prop
-  cities, // Add cities prop
+  lakes,
+  rivers,
+  cities,
   currentTurnSpending,
   maxTurnSpending,
   onSpendingChange,
@@ -791,13 +789,39 @@ const Board: React.FC<BoardProps> = ({
               </mesh>
             );
           } else {
-            // MAJOR cities: multi-milepost area (larger circle)
-            return (
-              <mesh key={`city-${index}`} position={[centerX, centerY, 0.8]}>
-                <circleGeometry args={[25, 32]} />
-                <meshStandardMaterial color="#ff4444" transparent={true} opacity={0.3} />
-              </mesh>
-            );
+            // MAJOR cities: hexagonal filled area using the 6 outer mileposts
+            if (city.mileposts.length >= 7) {
+              // Get the 6 outer mileposts (skip the center one at index 0)
+              const outerMileposts = city.mileposts.slice(1);
+              
+              // Create hexagon shape using ShapeGeometry
+              const hexagonShape = new THREE.Shape();
+              outerMileposts.forEach((mp, i) => {
+                const localX = mp.xCoord - centerX;
+                const localY = mp.yCoord - centerY;
+                if (i === 0) {
+                  hexagonShape.moveTo(localX, localY);
+                } else {
+                  hexagonShape.lineTo(localX, localY);
+                }
+              });
+              hexagonShape.closePath();
+              
+              return (
+                <mesh key={`city-${index}`} position={[centerX, centerY, 0.8]}>
+                  <shapeGeometry args={[hexagonShape]} />
+                  <meshStandardMaterial color="#ff4444" transparent={true} opacity={0.3} />
+                </mesh>
+              );
+            } else {
+              // Fallback to circle if not enough mileposts
+              return (
+                <mesh key={`city-${index}`} position={[centerX, centerY, 0.8]}>
+                  <circleGeometry args={[25, 32]} />
+                  <meshStandardMaterial color="#ff4444" transparent={true} opacity={0.3} />
+                </mesh>
+              );
+            }
           }
         })}
 
@@ -852,16 +876,8 @@ const Board: React.FC<BoardProps> = ({
         {/* Only render mileposts when not loading */}
         {!isLoading &&
           mileposts.map((props, index) => {
-            // Check if this is a city milepost by checking for the city property
-            const isCityMilepost = 'city' in props;
-            
-            if (isCityMilepost) {
-              return <CityMilepost key={index} {...(props as CityMilepostType)} />;
-            } else if (props.isMountain) {
-              return <MountainMilepost key={index} {...props} />;
-            } else {
-              return <Milepost key={index} {...props} />;
-            }
+            // All mileposts now use the unified Milepost component
+            return <Milepost key={index} {...props} />;
           })}
       </Canvas>
       <div style={{ position: "absolute" }}>

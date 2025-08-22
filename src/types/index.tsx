@@ -12,13 +12,17 @@ export interface MilepostProps {
   yCoord: number;
   selected: boolean;
   color: string;
-  isMountain: boolean; // Optional property for mountain mileposts
-  onClick: () => void; // Optional click handler
-  isClickable: boolean; // Optional property to indicate if milepost is clickable
-  onPointerEnter: () => void; // Optional hover enter handler
-  onPointerLeave: () => void; // Optional hover leave handler
-  isPreviewTarget: boolean; // Optional property to indicate if milepost is preview target
+  isMountain: boolean; // Mountain milepost flag
+  isCity: boolean; // City milepost flag
+  onClick: () => void; // Click handler
+  isClickable: boolean; // Indicates if milepost is clickable
+  onPointerEnter: () => void; // Hover enter handler
+  onPointerLeave: () => void; // Hover leave handler
+  isPreviewTarget: boolean; // Indicates if milepost is preview target
   cost: number; // Cost to connect to this milepost
+  city?: City; // Reference to city if this is a city milepost
+  connectedPlayers?: Player[]; // Players connected to this city milepost
+  maxConnections?: number; // Maximum connections allowed for city milepost
 }
 
 export enum CitySize {
@@ -38,14 +42,8 @@ export interface City {
   id: string;
   name: string;
   size: CitySize;
-  mileposts: CityMilepost[];
+  mileposts: MilepostProps[]; // Changed from CityMilepost[] to MilepostProps[]
   goods: Good[];
-}
-
-export interface CityMilepost extends MilepostProps {
-  city: City;
-  connectedPlayers: Player[];
-  maxConnections: number;
 }
 
 export type LineCoordinates = {

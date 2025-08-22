@@ -24,7 +24,7 @@ import {
   addRiverMeandering,
   reduceSharpAngles,
 } from "../utils/pathFinder";
-import type { MilepostProps, CitySize, City, CityMilepost, Good } from "../types";
+import type { MilepostProps, CitySize, City, Good } from "../types";
 import { CitySize as CitySizeEnum } from "../types";
 
 const COLOR_OPTIONS = [
@@ -41,10 +41,26 @@ const COLOR_OPTIONS = [
 ];
 
 const CITY_NAMES = [
-  "New Metropolis", "Port Haven", "Mountain View", "Riverside", "Capitol City",
-  "Goldfield", "Iron Ridge", "Cedar Falls", "Stone Bridge", "Sunset Valley",
-  "Crystal Bay", "Pine Grove", "Silver Creek", "Oak Harbor", "Maple Junction",
-  "Thunder Peak", "Green Valley", "Blue Lake", "Red Rock", "Golden Gate"
+  "New Metropolis",
+  "Port Haven",
+  "Mountain View",
+  "Riverside",
+  "Capitol City",
+  "Goldfield",
+  "Iron Ridge",
+  "Cedar Falls",
+  "Stone Bridge",
+  "Sunset Valley",
+  "Crystal Bay",
+  "Pine Grove",
+  "Silver Creek",
+  "Oak Harbor",
+  "Maple Junction",
+  "Thunder Peak",
+  "Green Valley",
+  "Blue Lake",
+  "Red Rock",
+  "Golden Gate",
 ];
 
 const GOODS_DATA: Good[] = [
@@ -54,7 +70,12 @@ const GOODS_DATA: Good[] = [
   { id: "iron", name: "Iron", value: 5, color: "#696969" },
   { id: "lumber", name: "Lumber", value: 3, color: "#228B22" },
   { id: "oil", name: "Oil", value: 6, color: "#000000" },
-  { id: "manufactured", name: "Manufactured Goods", value: 7, color: "#8A2BE2" },
+  {
+    id: "manufactured",
+    name: "Manufactured Goods",
+    value: 7,
+    color: "#8A2BE2",
+  },
   { id: "textiles", name: "Textiles", value: 4, color: "#FF69B4" },
 ];
 
@@ -81,7 +102,7 @@ const Game: React.FC = () => {
     numRivers: 5,
     numLakes: 3,
     mountainDensity: 0.15,
-    numMajorCities: 2,
+    numMajorCities: 5,
   });
   const [playerConfigs, setPlayerConfigs] = useState<
     Array<{ name: string; color: string }>
@@ -278,18 +299,18 @@ const Game: React.FC = () => {
         const j = (i + 1) % lake.length;
         const lineStart = lake[i];
         const lineEnd = lake[j];
-        
+
         // Calculate distance from point to line segment
         const A = x - lineStart[0];
         const B = y - lineStart[1];
         const C = lineEnd[0] - lineStart[0];
         const D = lineEnd[1] - lineStart[1];
-        
+
         const dot = A * C + B * D;
         const lenSq = C * C + D * D;
         let param = -1;
         if (lenSq !== 0) param = dot / lenSq;
-        
+
         let xx, yy;
         if (param < 0) {
           xx = lineStart[0];
@@ -301,11 +322,11 @@ const Game: React.FC = () => {
           xx = lineStart[0] + param * C;
           yy = lineStart[1] + param * D;
         }
-        
+
         const dx = x - xx;
         const dy = y - yy;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        
+
         if (distance <= tolerance) {
           return true;
         }
@@ -324,17 +345,17 @@ const Game: React.FC = () => {
     if (point[0] === startPoint[0] && point[1] === startPoint[1]) {
       return true;
     }
-    
+
     // Check if point is inside any lake
     if (isPointInAnyLake(point[0], point[1], lakes)) {
       return false;
     }
-    
+
     // Check if point is on any lake edge
     if (isPointOnAnyLakeEdge(point[0], point[1], lakes)) {
       return false;
     }
-    
+
     return true;
   };
 
@@ -350,18 +371,24 @@ const Game: React.FC = () => {
 
     // Helper function to get a random unused city name
     const getRandomCityName = (): string => {
-      const availableNames = CITY_NAMES.filter(name => !usedNames.has(name));
+      const availableNames = CITY_NAMES.filter((name) => !usedNames.has(name));
       if (availableNames.length === 0) {
         return `City ${cityIdCounter}`;
       }
-      const name = availableNames[Math.floor(Math.random() * availableNames.length)];
+      const name =
+        availableNames[Math.floor(Math.random() * availableNames.length)];
       usedNames.add(name);
       return name;
     };
 
     // Helper function to get random goods for a city
     const getRandomGoods = (citySize: CitySize): Good[] => {
-      const numGoods = citySize === CitySizeEnum.MAJOR ? 3 : citySize === CitySizeEnum.MEDIUM ? 2 : 1;
+      const numGoods =
+        citySize === CitySizeEnum.MAJOR
+          ? 3
+          : citySize === CitySizeEnum.MEDIUM
+          ? 2
+          : 1;
       const shuffledGoods = [...GOODS_DATA].sort(() => Math.random() - 0.5);
       return shuffledGoods.slice(0, numGoods);
     };
@@ -371,18 +398,23 @@ const Game: React.FC = () => {
       // Calculate which row and column this would be on the milepost grid
       const row = Math.round((y - VERTICAL_SPACING) / VERTICAL_SPACING);
       const isOddRow = row % 2 === 1;
-      const baseX = HORIZONTAL_SPACING / 2 + (isOddRow ? HORIZONTAL_SPACING / 2 : 0);
+      const baseX =
+        HORIZONTAL_SPACING / 2 + (isOddRow ? HORIZONTAL_SPACING / 2 : 0);
       const col = Math.round((x - baseX) / HORIZONTAL_SPACING);
-      
+
       // Calculate the actual grid position
       const gridX = col * HORIZONTAL_SPACING + baseX;
       const gridY = row * VERTICAL_SPACING + VERTICAL_SPACING;
-      
+
       return [gridX, gridY];
     };
 
     // Helper function to check if a point is valid for city placement
-    const isValidCityLocation = (x: number, y: number, existingCities: City[]): boolean => {
+    const isValidCityLocation = (
+      x: number,
+      y: number,
+      existingCities: City[]
+    ): boolean => {
       // Check if inside boundary
       if (!isPointInPolygon(x, y, boundaryPoints)) {
         return false;
@@ -417,8 +449,11 @@ const Game: React.FC = () => {
     for (let row = 0; row < numRows; row++) {
       for (let col = 0; col < numCols; col++) {
         const y = row * VERTICAL_SPACING + VERTICAL_SPACING;
-        const x = col * HORIZONTAL_SPACING + HORIZONTAL_SPACING / 2 + (row % 2 === 1 ? HORIZONTAL_SPACING / 2 : 0);
-        
+        const x =
+          col * HORIZONTAL_SPACING +
+          HORIZONTAL_SPACING / 2 +
+          (row % 2 === 1 ? HORIZONTAL_SPACING / 2 : 0);
+
         if (x < boardWidth && y < boardHeight) {
           gridPositions.push([x, y]);
         }
@@ -426,54 +461,65 @@ const Game: React.FC = () => {
     }
 
     // Shuffle grid positions for random placement
-    const shuffledPositions = [...gridPositions].sort(() => Math.random() - 0.5);
+    const shuffledPositions = [...gridPositions].sort(
+      () => Math.random() - 0.5
+    );
 
     // Generate MAJOR cities first
     let positionIndex = 0;
     for (let i = 0; i < numMajorCities; i++) {
       let validLocationFound = false;
-      
+
       while (positionIndex < shuffledPositions.length && !validLocationFound) {
         const [centerX, centerY] = shuffledPositions[positionIndex];
         positionIndex++;
-        
+
         if (isValidCityLocation(centerX, centerY, cities)) {
-          // Create 4 mileposts in a grid pattern for major cities
-          const cityMileposts: CityMilepost[] = [];
+          // Create 7 mileposts in a hexagonal pattern for major cities (1 center + 6 surrounding)
+          const cityMileposts: MilepostProps[] = [];
+
+          // Calculate hexagonal positions around the center
+          // Use North/South instead of East/West for equidistant positioning
           const positions = [
-            [centerX - HORIZONTAL_SPACING/2, centerY - VERTICAL_SPACING/2],
-            [centerX + HORIZONTAL_SPACING/2, centerY - VERTICAL_SPACING/2],
-            [centerX - HORIZONTAL_SPACING/2, centerY + VERTICAL_SPACING/2],
-            [centerX + HORIZONTAL_SPACING/2, centerY + VERTICAL_SPACING/2]
+            // Center milepost
+            [centerX, centerY],
+            // 6 surrounding mileposts in hexagonal pattern using grid spacing
+            [centerX, centerY - VERTICAL_SPACING * 2], // North
+            [centerX + HORIZONTAL_SPACING / 2, centerY - VERTICAL_SPACING], // Northeast
+            [centerX + HORIZONTAL_SPACING / 2, centerY + VERTICAL_SPACING], // Southeast
+            [centerX, centerY + VERTICAL_SPACING * 2], // South
+            [centerX - HORIZONTAL_SPACING / 2, centerY + VERTICAL_SPACING], // Southwest
+            [centerX - HORIZONTAL_SPACING / 2, centerY - VERTICAL_SPACING], // Northwest
           ];
-          
+
           // Snap all positions to grid and check validity
           const snappedPositions = positions.map(([x, y]) => snapToGrid(x, y));
           let allPositionsValid = true;
-          
+
           for (const [x, y] of snappedPositions) {
             if (!isValidCityLocation(x, y, cities)) {
               allPositionsValid = false;
               break;
             }
           }
-          
+
           if (allPositionsValid) {
             const city: City = {
               id: `city_${cityIdCounter++}`,
               name: getRandomCityName(),
               size: CitySizeEnum.MAJOR,
               mileposts: [],
-              goods: getRandomGoods(CitySizeEnum.MAJOR)
+              goods: getRandomGoods(CitySizeEnum.MAJOR),
             };
 
             for (const [x, y] of snappedPositions) {
-              const cityMilepost: CityMilepost = {
+              const cityMilepost: MilepostProps = {
                 xCoord: x,
                 yCoord: y,
                 selected: false,
                 color: "red",
                 isMountain: false,
+                isCity: true,
                 isClickable: true,
                 cost: 5,
                 onPointerEnter: () => {},
@@ -482,11 +528,11 @@ const Game: React.FC = () => {
                 onClick: () => {},
                 city: city,
                 connectedPlayers: [],
-                maxConnections: Infinity
+                maxConnections: Infinity,
               };
               cityMileposts.push(cityMilepost);
             }
-            
+
             city.mileposts = cityMileposts;
             cities.push(city);
             validLocationFound = true;
@@ -499,26 +545,27 @@ const Game: React.FC = () => {
     const numMediumCities = numMajorCities * 3;
     for (let i = 0; i < numMediumCities; i++) {
       let validLocationFound = false;
-      
+
       while (positionIndex < shuffledPositions.length && !validLocationFound) {
         const [x, y] = shuffledPositions[positionIndex];
         positionIndex++;
-        
+
         if (isValidCityLocation(x, y, cities)) {
           const city: City = {
             id: `city_${cityIdCounter++}`,
             name: getRandomCityName(),
             size: CitySizeEnum.MEDIUM,
             mileposts: [],
-            goods: getRandomGoods(CitySizeEnum.MEDIUM)
+            goods: getRandomGoods(CitySizeEnum.MEDIUM),
           };
 
-          const cityMilepost: CityMilepost = {
+          const cityMilepost: MilepostProps = {
             xCoord: x,
             yCoord: y,
             selected: false,
             color: "red",
             isMountain: false,
+            isCity: true,
             isClickable: true,
             cost: 3,
             onPointerEnter: () => {},
@@ -527,9 +574,9 @@ const Game: React.FC = () => {
             onClick: () => {},
             city: city,
             connectedPlayers: [],
-            maxConnections: 4
+            maxConnections: 4,
           };
-          
+
           city.mileposts = [cityMilepost];
           cities.push(city);
           validLocationFound = true;
@@ -541,26 +588,27 @@ const Game: React.FC = () => {
     const numSmallCities = numMajorCities * 3;
     for (let i = 0; i < numSmallCities; i++) {
       let validLocationFound = false;
-      
+
       while (positionIndex < shuffledPositions.length && !validLocationFound) {
         const [x, y] = shuffledPositions[positionIndex];
         positionIndex++;
-        
+
         if (isValidCityLocation(x, y, cities)) {
           const city: City = {
             id: `city_${cityIdCounter++}`,
             name: getRandomCityName(),
             size: CitySizeEnum.SMALL,
             mileposts: [],
-            goods: getRandomGoods(CitySizeEnum.SMALL)
+            goods: getRandomGoods(CitySizeEnum.SMALL),
           };
 
-          const cityMilepost: CityMilepost = {
+          const cityMilepost: MilepostProps = {
             xCoord: x,
             yCoord: y,
             selected: false,
             color: "red",
             isMountain: false,
+            isCity: true,
             isClickable: true,
             cost: 3,
             onPointerEnter: () => {},
@@ -569,9 +617,9 @@ const Game: React.FC = () => {
             onClick: () => {},
             city: city,
             connectedPlayers: [],
-            maxConnections: 3
+            maxConnections: 3,
           };
-          
+
           city.mileposts = [cityMilepost];
           cities.push(city);
           validLocationFound = true;
@@ -579,7 +627,9 @@ const Game: React.FC = () => {
       }
     }
 
-    console.log(`Generated ${cities.length} cities: ${numMajorCities} major, ${numMediumCities} medium, ${numSmallCities} small`);
+    console.log(
+      `Generated ${cities.length} cities: ${numMajorCities} major, ${numMediumCities} medium, ${numSmallCities} small`
+    );
     return cities;
   };
 
@@ -617,23 +667,23 @@ const Game: React.FC = () => {
     // Helper function to get distance from point to boundary line
     const getDistanceToBoundary = (point: [number, number]): number => {
       let minDistance = Infinity;
-      
+
       for (let i = 0; i < boundaryPoints.length; i++) {
         const j = (i + 1) % boundaryPoints.length;
         const lineStart = boundaryPoints[i];
         const lineEnd = boundaryPoints[j];
-        
+
         // Calculate distance from point to line segment
         const A = point[0] - lineStart[0];
         const B = point[1] - lineStart[1];
         const C = lineEnd[0] - lineStart[0];
         const D = lineEnd[1] - lineStart[1];
-        
+
         const dot = A * C + B * D;
         const lenSq = C * C + D * D;
         let param = -1;
         if (lenSq !== 0) param = dot / lenSq;
-        
+
         let xx, yy;
         if (param < 0) {
           xx = lineStart[0];
@@ -645,13 +695,13 @@ const Game: React.FC = () => {
           xx = lineStart[0] + param * C;
           yy = lineStart[1] + param * D;
         }
-        
+
         const dx = point[0] - xx;
         const dy = point[1] - yy;
         const distance = Math.sqrt(dx * dx + dy * dy);
         minDistance = Math.min(minDistance, distance);
       }
-      
+
       return minDistance;
     };
 
@@ -679,18 +729,30 @@ const Game: React.FC = () => {
 
       // Generate candidate interior points
       for (let i = 0; i < 50; i++) {
-        const x = boundingBox.minX + Math.random() * (boundingBox.maxX - boundingBox.minX);
-        const y = boundingBox.minY + Math.random() * (boundingBox.maxY - boundingBox.minY);
-        
+        const x =
+          boundingBox.minX +
+          Math.random() * (boundingBox.maxX - boundingBox.minX);
+        const y =
+          boundingBox.minY +
+          Math.random() * (boundingBox.maxY - boundingBox.minY);
+
         // Check if point meets all criteria
         const isInBoundary = isPointInPolygon(x, y, boundaryPoints);
         const isNotInLake = !isPointInAnyLake(x, y, lakes);
-        const isNotInMilepostRadius = !milepostCircles.some(circle => 
-          getDistanceBetweenPoints([x, y], [circle.x, circle.y]) < circle.radius
+        const isNotInMilepostRadius = !milepostCircles.some(
+          (circle) =>
+            getDistanceBetweenPoints([x, y], [circle.x, circle.y]) <
+            circle.radius
         );
-        const isNotTooCloseToBoundary = getDistanceToBoundary([x, y]) >= 2 * HORIZONTAL_SPACING;
-        
-        if (isInBoundary && isNotInLake && isNotInMilepostRadius && isNotTooCloseToBoundary) {
+        const isNotTooCloseToBoundary =
+          getDistanceToBoundary([x, y]) >= 2 * HORIZONTAL_SPACING;
+
+        if (
+          isInBoundary &&
+          isNotInLake &&
+          isNotInMilepostRadius &&
+          isNotTooCloseToBoundary
+        ) {
           options.push([x, y]);
         }
       }
@@ -700,39 +762,54 @@ const Game: React.FC = () => {
     };
 
     // Helper function to determine ending point (on boundary, not within milepost radius)
-    const determineEndingPoint = (startPoint?: [number, number]): [number, number] | null => {
+    const determineEndingPoint = (
+      startPoint?: [number, number]
+    ): [number, number] | null => {
       const options: [number, number][] = [];
-      
+
       // Sample boundary points and check if they're valid
-      for (let i = 0; i < boundaryPoints.length; i += 3) { // Sample every 3rd point
+      for (let i = 0; i < boundaryPoints.length; i += 3) {
+        // Sample every 3rd point
         const boundaryPoint = boundaryPoints[i];
-        const isNotInMilepostRadius = !milepostCircles.some(circle => 
-          getDistanceBetweenPoints(boundaryPoint, [circle.x, circle.y]) < circle.radius
+        const isNotInMilepostRadius = !milepostCircles.some(
+          (circle) =>
+            getDistanceBetweenPoints(boundaryPoint, [circle.x, circle.y]) <
+            circle.radius
         );
-        
+
         if (isNotInMilepostRadius) {
           // If we have a start point and it's on a lake edge, check if this boundary point is in valid direction
-          if (startPoint && isPointOnAnyLakeEdge(startPoint[0], startPoint[1], lakes, 3)) {
+          if (
+            startPoint &&
+            isPointOnAnyLakeEdge(startPoint[0], startPoint[1], lakes, 3)
+          ) {
             // Find which lake the start point is on
             let sourceLake: [number, number][] | null = null;
             for (const lake of lakes) {
-              if (isPointOnAnyLakeEdge(startPoint[0], startPoint[1], [lake], 3)) {
+              if (
+                isPointOnAnyLakeEdge(startPoint[0], startPoint[1], [lake], 3)
+              ) {
                 sourceLake = lake;
                 break;
               }
             }
-            
+
             if (sourceLake) {
               // Calculate direction from start to this boundary point
               const dx = boundaryPoint[0] - startPoint[0];
               const dy = boundaryPoint[1] - startPoint[1];
               const distance = Math.sqrt(dx * dx + dy * dy);
-              
+
               if (distance > 0) {
-                const direction: [number, number] = [dx / distance, dy / distance];
-                
+                const direction: [number, number] = [
+                  dx / distance,
+                  dy / distance,
+                ];
+
                 // Check if this direction is valid (in the 180-degree arc away from lake)
-                if (isDirectionValidForLakeEdge(startPoint, direction, sourceLake)) {
+                if (
+                  isDirectionValidForLakeEdge(startPoint, direction, sourceLake)
+                ) {
                   options.push(boundaryPoint);
                 }
               }
@@ -753,9 +830,15 @@ const Game: React.FC = () => {
       segmentStart: [number, number],
       segmentEnd: [number, number],
       startPoint: [number, number]
-    ): { intersects: boolean; obstacle?: { coords: [number, number]; radius: number } } => {
+    ): {
+      intersects: boolean;
+      obstacle?: { coords: [number, number]; radius: number };
+    } => {
       // Skip check if this segment starts from the original start point (allowed to connect to lake)
-      if (segmentStart[0] === startPoint[0] && segmentStart[1] === startPoint[1]) {
+      if (
+        segmentStart[0] === startPoint[0] &&
+        segmentStart[1] === startPoint[1]
+      ) {
         return { intersects: false };
       }
 
@@ -770,19 +853,22 @@ const Game: React.FC = () => {
           );
           if (intersection) {
             // Calculate lake center for better obstacle avoidance
-            const lakeCenter = lake.reduce(
-              (acc, point) => [acc[0] + point[0], acc[1] + point[1]],
-              [0, 0] as [number, number]
-            ).map(coord => coord / lake.length) as [number, number];
-            
+            const lakeCenter = lake
+              .reduce((acc, point) => [acc[0] + point[0], acc[1] + point[1]], [
+                0, 0,
+              ] as [number, number])
+              .map((coord) => coord / lake.length) as [number, number];
+
             // Calculate approximate radius as distance from center to furthest point
             const maxDistance = Math.max(
-              ...lake.map(point => getDistanceBetweenPoints(lakeCenter, point))
+              ...lake.map((point) =>
+                getDistanceBetweenPoints(lakeCenter, point)
+              )
             );
-            
+
             return {
               intersects: true,
-              obstacle: { coords: lakeCenter, radius: maxDistance + 5 } // Add 5 unit buffer
+              obstacle: { coords: lakeCenter, radius: maxDistance + 5 }, // Add 5 unit buffer
             };
           }
         }
@@ -794,7 +880,10 @@ const Game: React.FC = () => {
     const checkMilepostIntersection = (
       segmentStart: [number, number],
       segmentEnd: [number, number]
-    ): { intersects: boolean; obstacle?: { coords: [number, number]; radius: number } } => {
+    ): {
+      intersects: boolean;
+      obstacle?: { coords: [number, number]; radius: number };
+    } => {
       for (const circle of milepostCircles) {
         const intersects = doesPolylineIntersectCircles(
           [segmentStart, segmentEnd],
@@ -803,7 +892,7 @@ const Game: React.FC = () => {
         if (intersects) {
           return {
             intersects: true,
-            obstacle: { coords: [circle.x, circle.y], radius: circle.radius }
+            obstacle: { coords: [circle.x, circle.y], radius: circle.radius },
           };
         }
       }
@@ -840,8 +929,12 @@ const Game: React.FC = () => {
         );
         if (intersection) {
           // Only return if it's not the original endpoint
-          const distToOriginal = getDistanceBetweenPoints(intersection, originalEndPoint);
-          if (distToOriginal > 1) { // Small tolerance
+          const distToOriginal = getDistanceBetweenPoints(
+            intersection,
+            originalEndPoint
+          );
+          if (distToOriginal > 1) {
+            // Small tolerance
             return intersection;
           }
         }
@@ -857,19 +950,27 @@ const Game: React.FC = () => {
       // Step 1: Set random startPoint
       const startPoint = determineStartingPoint();
       if (!startPoint) {
-        console.log(`Could not find valid starting point for river ${riverIndex + 1}`);
+        console.log(
+          `Could not find valid starting point for river ${riverIndex + 1}`
+        );
         continue;
       }
 
       // Step 2: Set random endPoint on boundary
       const originalEndPoint = determineEndingPoint(startPoint);
       if (!originalEndPoint) {
-        console.log(`Could not find valid ending point for river ${riverIndex + 1}`);
+        console.log(
+          `Could not find valid ending point for river ${riverIndex + 1}`
+        );
         continue;
       }
 
       console.log(
-        `River ${riverIndex + 1}: Start (${startPoint[0].toFixed(0)}, ${startPoint[1].toFixed(0)}) -> End (${originalEndPoint[0].toFixed(0)}, ${originalEndPoint[1].toFixed(0)})`
+        `River ${riverIndex + 1}: Start (${startPoint[0].toFixed(
+          0
+        )}, ${startPoint[1].toFixed(0)}) -> End (${originalEndPoint[0].toFixed(
+          0
+        )}, ${originalEndPoint[1].toFixed(0)})`
       );
 
       // Step 3: Generate river segments
@@ -881,7 +982,12 @@ const Game: React.FC = () => {
       let iteration = 0;
 
       // Check if river starts from a lake edge
-      const startsFromLake = isPointOnAnyLakeEdge(startPoint[0], startPoint[1], lakes, 3);
+      const startsFromLake = isPointOnAnyLakeEdge(
+        startPoint[0],
+        startPoint[1],
+        lakes,
+        3
+      );
       let lakeDepartureSegmentsRemaining = startsFromLake ? 3 : 0; // Force away direction for first 3 segments
 
       while (!reachedEnd && iteration < maxIterations) {
@@ -891,7 +997,7 @@ const Game: React.FC = () => {
         let dx = endPoint[0] - currentPoint[0];
         let dy = endPoint[1] - currentPoint[1];
         const originalDistanceToEnd = Math.sqrt(dx * dx + dy * dy);
-        
+
         // Special handling for rivers starting from lakes - force away direction for first few segments
         if (lakeDepartureSegmentsRemaining > 0) {
           // Find the lake this river is departing from
@@ -902,97 +1008,115 @@ const Game: React.FC = () => {
               break;
             }
           }
-          
+
           if (sourceLake) {
             // Get the direction away from the lake edge (perpendicular to tangent, away from lake interior)
-            const awayDirection = getDirectionAwayFromLakeEdge(startPoint, sourceLake, 3);
-            
+            const awayDirection = getDirectionAwayFromLakeEdge(
+              startPoint,
+              sourceLake,
+              3
+            );
+
             if (awayDirection) {
               // Normalize original target direction
-              const targetDirX = originalDistanceToEnd > 0 ? dx / originalDistanceToEnd : 0;
-              const targetDirY = originalDistanceToEnd > 0 ? dy / originalDistanceToEnd : 0;
-              
+              const targetDirX =
+                originalDistanceToEnd > 0 ? dx / originalDistanceToEnd : 0;
+              const targetDirY =
+                originalDistanceToEnd > 0 ? dy / originalDistanceToEnd : 0;
+
               // Check if target direction is in the valid 180-degree arc away from lake
               const isTargetValid = isDirectionValidForLakeEdge(
-                startPoint, 
-                [targetDirX, targetDirY], 
+                startPoint,
+                [targetDirX, targetDirY],
                 sourceLake
               );
-              
+
               if (isTargetValid) {
                 // Blend away direction with target direction (more away at start, more target later)
                 const awayWeight = lakeDepartureSegmentsRemaining / 3; // 1.0 to 0.33
                 const targetWeight = 1 - awayWeight;
-                
-                const blendedDirX = awayDirection[0] * awayWeight + targetDirX * targetWeight;
-                const blendedDirY = awayDirection[1] * awayWeight + targetDirY * targetWeight;
-                
+
+                const blendedDirX =
+                  awayDirection[0] * awayWeight + targetDirX * targetWeight;
+                const blendedDirY =
+                  awayDirection[1] * awayWeight + targetDirY * targetWeight;
+
                 // Normalize blended direction and apply segment length
-                const blendedLength = Math.sqrt(blendedDirX * blendedDirX + blendedDirY * blendedDirY);
+                const blendedLength = Math.sqrt(
+                  blendedDirX * blendedDirX + blendedDirY * blendedDirY
+                );
                 if (blendedLength > 0) {
                   dx = (blendedDirX / blendedLength) * segmentLength;
                   dy = (blendedDirY / blendedLength) * segmentLength;
                 }
-                
+
                 console.log(
-                  `River ${riverIndex + 1} departure segment ${4 - lakeDepartureSegmentsRemaining}: blending valid target direction with away direction`
+                  `River ${riverIndex + 1} departure segment ${
+                    4 - lakeDepartureSegmentsRemaining
+                  }: blending valid target direction with away direction`
                 );
               } else {
                 // Target direction is in wrong hemisphere, use pure away direction
                 dx = awayDirection[0] * segmentLength;
                 dy = awayDirection[1] * segmentLength;
-                
+
                 console.log(
-                  `River ${riverIndex + 1} departure segment ${4 - lakeDepartureSegmentsRemaining}: target direction invalid, using pure away direction`
+                  `River ${riverIndex + 1} departure segment ${
+                    4 - lakeDepartureSegmentsRemaining
+                  }: target direction invalid, using pure away direction`
                 );
               }
             } else {
               // Fallback to original away-from-center logic if edge direction calculation fails
-              const lakeCenter = sourceLake.reduce(
-                (acc, point) => [acc[0] + point[0], acc[1] + point[1]],
-                [0, 0] as [number, number]
-              ).map(coord => coord / sourceLake.length) as [number, number];
-              
+              const lakeCenter = sourceLake
+                .reduce(
+                  (acc, point) => [acc[0] + point[0], acc[1] + point[1]],
+                  [0, 0] as [number, number]
+                )
+                .map((coord) => coord / sourceLake.length) as [number, number];
+
               const awayX = currentPoint[0] - lakeCenter[0];
               const awayY = currentPoint[1] - lakeCenter[1];
               const awayLength = Math.sqrt(awayX * awayX + awayY * awayY);
-              
+
               if (awayLength > 0) {
                 dx = (awayX / awayLength) * segmentLength;
                 dy = (awayY / awayLength) * segmentLength;
               }
-              
+
               console.log(
-                `River ${riverIndex + 1} departure segment ${4 - lakeDepartureSegmentsRemaining}: fallback to away-from-center direction`
+                `River ${riverIndex + 1} departure segment ${
+                  4 - lakeDepartureSegmentsRemaining
+                }: fallback to away-from-center direction`
               );
             }
-            
+
             lakeDepartureSegmentsRemaining--;
           }
         }
-        
+
         // Step 8: Calculate nextPoint
         let nextPoint: [number, number];
-        
+
         // Step 9: If endPoint is closer than segmentLength and not in lake departure mode, use endPoint
-        if (originalDistanceToEnd <= segmentLength && lakeDepartureSegmentsRemaining === 0) {
+        if (
+          originalDistanceToEnd <= segmentLength &&
+          lakeDepartureSegmentsRemaining === 0
+        ) {
           nextPoint = endPoint;
           reachedEnd = true;
         } else {
           // For lake departure or normal segments, use calculated direction
           if (lakeDepartureSegmentsRemaining > 0) {
             // Use the blended direction (dx, dy already adjusted above)
-            nextPoint = [
-              currentPoint[0] + dx,
-              currentPoint[1] + dy
-            ];
+            nextPoint = [currentPoint[0] + dx, currentPoint[1] + dy];
           } else {
             // Normal segment toward endPoint
             const directionX = dx / originalDistanceToEnd;
             const directionY = dy / originalDistanceToEnd;
             nextPoint = [
               currentPoint[0] + directionX * segmentLength,
-              currentPoint[1] + directionY * segmentLength
+              currentPoint[1] + directionY * segmentLength,
             ];
           }
         }
@@ -1000,10 +1124,17 @@ const Game: React.FC = () => {
         // Step 10: Check for intersections while nextPoint is not equal to endPoint
         if (!reachedEnd) {
           // Always check milepost intersection (Step 10B) - this is critical for gameplay
-          const milepostCheck = checkMilepostIntersection(currentPoint, nextPoint);
+          const milepostCheck = checkMilepostIntersection(
+            currentPoint,
+            nextPoint
+          );
           if (milepostCheck.intersects && milepostCheck.obstacle) {
             console.log(
-              `River ${riverIndex + 1} avoiding milepost at (${milepostCheck.obstacle.coords[0].toFixed(0)}, ${milepostCheck.obstacle.coords[1].toFixed(0)})`
+              `River ${
+                riverIndex + 1
+              } avoiding milepost at (${milepostCheck.obstacle.coords[0].toFixed(
+                0
+              )}, ${milepostCheck.obstacle.coords[1].toFixed(0)})`
             );
             nextPoint = getTempEndpointFromPerpendicularLine(
               currentPoint,
@@ -1016,10 +1147,18 @@ const Game: React.FC = () => {
           // Check lake intersection (Step 10A) - be more lenient during departure but still check
           if (lakeDepartureSegmentsRemaining === 0) {
             // Normal lake collision detection
-            const lakeCheck = checkLakeIntersection(currentPoint, nextPoint, startPoint);
+            const lakeCheck = checkLakeIntersection(
+              currentPoint,
+              nextPoint,
+              startPoint
+            );
             if (lakeCheck.intersects && lakeCheck.obstacle) {
               console.log(
-                `River ${riverIndex + 1} avoiding lake at (${lakeCheck.obstacle.coords[0].toFixed(0)}, ${lakeCheck.obstacle.coords[1].toFixed(0)})`
+                `River ${
+                  riverIndex + 1
+                } avoiding lake at (${lakeCheck.obstacle.coords[0].toFixed(
+                  0
+                )}, ${lakeCheck.obstacle.coords[1].toFixed(0)})`
               );
               nextPoint = getTempEndpointFromPerpendicularLine(
                 currentPoint,
@@ -1030,7 +1169,11 @@ const Game: React.FC = () => {
             }
           } else {
             console.log(
-              `River ${riverIndex + 1} in lake departure mode, using relaxed lake collision check for segment ${4 - lakeDepartureSegmentsRemaining}`
+              `River ${
+                riverIndex + 1
+              } in lake departure mode, using relaxed lake collision check for segment ${
+                4 - lakeDepartureSegmentsRemaining
+              }`
             );
             // During departure, only avoid if we're going directly into a different lake
             if (!isPointSafeFromLakes(nextPoint, lakes, startPoint)) {
@@ -1039,16 +1182,22 @@ const Game: React.FC = () => {
               );
               // Find source lake to avoid going back into it
               for (const lake of lakes) {
-                if (isPointOnAnyLakeEdge(startPoint[0], startPoint[1], [lake], 3)) {
-                  const lakeCenter = lake.reduce(
-                    (acc, point) => [acc[0] + point[0], acc[1] + point[1]],
-                    [0, 0] as [number, number]
-                  ).map(coord => coord / lake.length) as [number, number];
-                  
+                if (
+                  isPointOnAnyLakeEdge(startPoint[0], startPoint[1], [lake], 3)
+                ) {
+                  const lakeCenter = lake
+                    .reduce(
+                      (acc, point) => [acc[0] + point[0], acc[1] + point[1]],
+                      [0, 0] as [number, number]
+                    )
+                    .map((coord) => coord / lake.length) as [number, number];
+
                   const maxDistance = Math.max(
-                    ...lake.map(point => getDistanceBetweenPoints(lakeCenter, point))
+                    ...lake.map((point) =>
+                      getDistanceBetweenPoints(lakeCenter, point)
+                    )
                   );
-                  
+
                   nextPoint = getTempEndpointFromPerpendicularLine(
                     currentPoint,
                     nextPoint,
@@ -1062,62 +1211,93 @@ const Game: React.FC = () => {
           }
 
           // Step 12: Check for river/boundary intersection
-          const intersection = checkRiverOrBoundaryIntersection(currentPoint, nextPoint, originalEndPoint);
+          const intersection = checkRiverOrBoundaryIntersection(
+            currentPoint,
+            nextPoint,
+            originalEndPoint
+          );
           if (intersection) {
             endPoint = intersection;
             nextPoint = intersection;
             reachedEnd = true;
             console.log(
-              `River ${riverIndex + 1} will terminate at intersection: (${intersection[0].toFixed(0)}, ${intersection[1].toFixed(0)})`
+              `River ${
+                riverIndex + 1
+              } will terminate at intersection: (${intersection[0].toFixed(
+                0
+              )}, ${intersection[1].toFixed(0)})`
             );
           }
 
           // Final validation: Ensure nextPoint is safe from lakes AND segment doesn't cross lakes
-          const isNextPointSafe = isPointSafeFromLakes(nextPoint, lakes, startPoint);
-          const isSegmentSafe = lakeDepartureSegmentsRemaining > 0 || 
-            !checkLakeIntersection(currentPoint, nextPoint, startPoint).intersects;
-          
+          const isNextPointSafe = isPointSafeFromLakes(
+            nextPoint,
+            lakes,
+            startPoint
+          );
+          const isSegmentSafe =
+            lakeDepartureSegmentsRemaining > 0 ||
+            !checkLakeIntersection(currentPoint, nextPoint, startPoint)
+              .intersects;
+
           if (!isNextPointSafe || !isSegmentSafe) {
             console.log(
-              `River ${riverIndex + 1} nextPoint (${nextPoint[0].toFixed(0)}, ${nextPoint[1].toFixed(0)}) is unsafe (point safe: ${isNextPointSafe}, segment safe: ${isSegmentSafe}), finding alternative`
+              `River ${riverIndex + 1} nextPoint (${nextPoint[0].toFixed(
+                0
+              )}, ${nextPoint[1].toFixed(
+                0
+              )}) is unsafe (point safe: ${isNextPointSafe}, segment safe: ${isSegmentSafe}), finding alternative`
             );
-            
+
             // Find the closest lake to avoid
             let closestLake: [number, number][] | null = null;
             let minDistanceToLake = Infinity;
-            
+
             for (const lake of lakes) {
-              const lakeCenter = lake.reduce(
-                (acc, point) => [acc[0] + point[0], acc[1] + point[1]],
-                [0, 0] as [number, number]
-              ).map(coord => coord / lake.length) as [number, number];
-              
-              const distanceToLakeCenter = getDistanceBetweenPoints(nextPoint, lakeCenter);
+              const lakeCenter = lake
+                .reduce(
+                  (acc, point) => [acc[0] + point[0], acc[1] + point[1]],
+                  [0, 0] as [number, number]
+                )
+                .map((coord) => coord / lake.length) as [number, number];
+
+              const distanceToLakeCenter = getDistanceBetweenPoints(
+                nextPoint,
+                lakeCenter
+              );
               if (distanceToLakeCenter < minDistanceToLake) {
                 minDistanceToLake = distanceToLakeCenter;
                 closestLake = lake;
               }
             }
-            
+
             if (closestLake) {
-              const lakeCenter = closestLake.reduce(
-                (acc, point) => [acc[0] + point[0], acc[1] + point[1]],
-                [0, 0] as [number, number]
-              ).map(coord => coord / closestLake.length) as [number, number];
-              
+              const lakeCenter = closestLake
+                .reduce(
+                  (acc, point) => [acc[0] + point[0], acc[1] + point[1]],
+                  [0, 0] as [number, number]
+                )
+                .map((coord) => coord / closestLake.length) as [number, number];
+
               const maxDistance = Math.max(
-                ...closestLake.map(point => getDistanceBetweenPoints(lakeCenter, point))
+                ...closestLake.map((point) =>
+                  getDistanceBetweenPoints(lakeCenter, point)
+                )
               );
-              
+
               nextPoint = getTempEndpointFromPerpendicularLine(
                 currentPoint,
                 nextPoint,
                 lakeCenter,
                 maxDistance + 10 // Extra buffer for safety
               );
-              
+
               console.log(
-                `River ${riverIndex + 1} found alternative nextPoint: (${nextPoint[0].toFixed(0)}, ${nextPoint[1].toFixed(0)})`
+                `River ${
+                  riverIndex + 1
+                } found alternative nextPoint: (${nextPoint[0].toFixed(
+                  0
+                )}, ${nextPoint[1].toFixed(0)})`
               );
             }
           }
@@ -1134,7 +1314,9 @@ const Game: React.FC = () => {
       }
 
       if (iteration >= maxIterations) {
-        console.log(`River ${riverIndex + 1} generation exceeded max iterations`);
+        console.log(
+          `River ${riverIndex + 1} generation exceeded max iterations`
+        );
         continue;
       }
 
@@ -1142,33 +1324,43 @@ const Game: React.FC = () => {
         // Create constraint checker function
         const isPointValid = (point: [number, number]): boolean => {
           // Check milepost collisions
-          const isNotInMilepostRadius = !milepostCircles.some(circle => 
-            getDistanceBetweenPoints(point, [circle.x, circle.y]) < circle.radius - 1 // Slightly smaller buffer for smoothing
+          const isNotInMilepostRadius = !milepostCircles.some(
+            (circle) =>
+              getDistanceBetweenPoints(point, [circle.x, circle.y]) <
+              circle.radius - 1 // Slightly smaller buffer for smoothing
           );
-          
+
           // Check lake safety (more lenient for smoothing)
           const isLakeSafe = isPointSafeFromLakes(point, lakes, startPoint);
-          
+
           return isNotInMilepostRadius && isLakeSafe;
         };
-        
+
         // Step 1: Reduce sharp angles to make the path more natural
         let smoothedRiver = reduceSharpAngles(points, Math.PI * 0.8);
-        
+
         // Step 2: Apply gentle meandering for natural river flow
         smoothedRiver = addRiverMeandering(smoothedRiver, 3, 0.15); // Reduced intensity for better constraint compliance
-        
+
         // Step 3: Apply constrained smooth curves
-        smoothedRiver = createConstrainedSmoothCurve(smoothedRiver, 0.4, isPointValid);
-        
+        smoothedRiver = createConstrainedSmoothCurve(
+          smoothedRiver,
+          0.4,
+          isPointValid
+        );
+
         rivers.push(smoothedRiver);
         console.log(
-          `Successfully created river ${riverIndex + 1} with ${points.length} original points, smoothed to ${smoothedRiver.length} points`
+          `Successfully created river ${riverIndex + 1} with ${
+            points.length
+          } original points, smoothed to ${smoothedRiver.length} points`
         );
       }
     }
 
-    console.log(`Generated ${rivers.length} rivers using new step-by-step logic`);
+    console.log(
+      `Generated ${rivers.length} rivers using new step-by-step logic`
+    );
     return rivers;
   };
 
@@ -1184,9 +1376,11 @@ const Game: React.FC = () => {
 
     // Create a set of city milepost coordinates for fast lookup
     const cityCoordinates = new Set<string>();
-    cities.forEach(city => {
-      city.mileposts.forEach(milepost => {
-        cityCoordinates.add(`${milepost.xCoord.toFixed(1)},${milepost.yCoord.toFixed(1)}`);
+    cities.forEach((city) => {
+      city.mileposts.forEach((milepost) => {
+        cityCoordinates.add(
+          `${milepost.xCoord.toFixed(1)},${milepost.yCoord.toFixed(1)}`
+        );
       });
     });
 
@@ -1197,9 +1391,9 @@ const Game: React.FC = () => {
           col * HORIZONTAL_SPACING +
           HORIZONTAL_SPACING / 2 +
           (row % 2 === 1 ? HORIZONTAL_SPACING / 2 : 0);
-        
+
         const coordKey = `${x.toFixed(1)},${y.toFixed(1)}`;
-        
+
         if (
           x < boardWidth &&
           y < boardHeight &&
@@ -1240,12 +1434,9 @@ const Game: React.FC = () => {
 
   // Generate cities
   const cities = useMemo(() => {
-    if (configStep !== "game" || loopPoints.length === 0 || lakes.length === 0) return []; // Don't generate until game starts
-    return generateCities(
-      loopPoints,
-      lakes,
-      gameConfig.numMajorCities
-    );
+    if (configStep !== "game" || loopPoints.length === 0 || lakes.length === 0)
+      return []; // Don't generate until game starts
+    return generateCities(loopPoints, lakes, gameConfig.numMajorCities);
   }, [loopPoints, lakes, gameConfig.numMajorCities, configStep]);
 
   // Calculate base radius for river length constraints
@@ -1259,7 +1450,12 @@ const Game: React.FC = () => {
 
   // Generate stable milepost data
   const mileposts = useMemo(() => {
-    if (configStep !== "game" || loopPoints.length === 0 || lakes.length === 0 || cities.length === 0)
+    if (
+      configStep !== "game" ||
+      loopPoints.length === 0 ||
+      lakes.length === 0 ||
+      cities.length === 0
+    )
       return []; // Don't generate until game starts
     const coords = generateMilepostCoords(loopPoints, lakes, cities);
     const generatedMileposts = coords.map(({ x, y }) => {
@@ -1270,6 +1466,7 @@ const Game: React.FC = () => {
         selected: false,
         color: "black",
         isMountain: isMountain,
+        isCity: false, // Regular mileposts are not cities
         isClickable: currentPhase === GamePhase.BUILD,
         cost: isMountain ? 2 : 1, // Mountain mileposts cost 2, regular mileposts cost 1
         onPointerEnter: () => {},
@@ -1280,17 +1477,17 @@ const Game: React.FC = () => {
 
     // Replace regular mileposts with city mileposts at overlapping coordinates
     let allMileposts = [...generatedMileposts];
-    
-    cities.forEach(city => {
-      city.mileposts.forEach(cityMilepost => {
+
+    cities.forEach((city) => {
+      city.mileposts.forEach((cityMilepost) => {
         // Find and remove any regular milepost at the same coordinates
         const tolerance = 1; // Small tolerance for coordinate matching
-        allMileposts = allMileposts.filter(regularMilepost => {
+        allMileposts = allMileposts.filter((regularMilepost) => {
           const dx = Math.abs(regularMilepost.xCoord - cityMilepost.xCoord);
           const dy = Math.abs(regularMilepost.yCoord - cityMilepost.yCoord);
           return dx > tolerance || dy > tolerance; // Keep if coordinates don't match
         });
-        
+
         // Add the city milepost
         allMileposts.push({
           ...cityMilepost,
@@ -1309,7 +1506,14 @@ const Game: React.FC = () => {
     );
 
     return allMileposts;
-  }, [loopPoints, lakes, cities, gameConfig.mountainDensity, currentPhase, configStep]);
+  }, [
+    loopPoints,
+    lakes,
+    cities,
+    gameConfig.mountainDensity,
+    currentPhase,
+    configStep,
+  ]);
 
   // Generate rivers connecting boundary to interior/lakes (after mileposts are generated)
   const rivers = useMemo(() => {
@@ -1707,8 +1911,8 @@ const Game: React.FC = () => {
               </label>
               <input
                 type="range"
-                min="1"
-                max="4"
+                min="3"
+                max="7"
                 value={gameConfig.numMajorCities}
                 onChange={(e) =>
                   setGameConfig({
